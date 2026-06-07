@@ -86,8 +86,8 @@ MIDDLEWARE = [
 # ── URL & WSGI ────────────────────────────────────────────────────────────────
 
 ROOT_URLCONF = 'afya1.urls'
-WSGI_APPLICATION = 'afya1.wsgi.application'
-ASGI_APPLICATION = 'afya1.asgi.application'
+WSGI_APPLICATION = 'backend.wsgi.application'
+ASGI_APPLICATION = 'backend.asgi.application'
 
 
 # ── Templates ─────────────────────────────────────────────────────────────────
