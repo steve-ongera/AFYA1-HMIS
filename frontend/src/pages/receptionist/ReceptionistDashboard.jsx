@@ -1,7 +1,7 @@
 // pages/receptionist/ReceptionistDashboard.jsx
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { dashboardAPI, visitsAPI, queueAPI, appointmentsAPI } from '../../services/api'
+import { dashboardAPI, visitsAPI } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 
 export default function ReceptionistDashboard() {
@@ -15,6 +15,12 @@ export default function ReceptionistDashboard() {
     loadDashboardData()
   }, [])
 
+  const normalizeList = (data) => {
+    if (Array.isArray(data)) return data
+    if (data && Array.isArray(data.results)) return data.results
+    return []
+  }
+
   const loadDashboardData = async () => {
     try {
       const [statsData, visitsData] = await Promise.all([
@@ -22,7 +28,7 @@ export default function ReceptionistDashboard() {
         visitsAPI.list({ today: true, limit: 10 })
       ])
       setStats(statsData)
-      setRecentVisits(visitsData)
+      setRecentVisits(normalizeList(visitsData))
     } catch (err) {
       console.error('Failed to load dashboard', err)
     } finally {
@@ -31,7 +37,7 @@ export default function ReceptionistDashboard() {
   }
 
   const statCards = [
-    { label: 'Today\'s Visits', value: stats?.today_visits || 0, icon: 'bi-calendar-check', color: 'primary' },
+    { label: "Today's Visits", value: stats?.today_visits || 0, icon: 'bi-calendar-check', color: 'primary' },
     { label: 'Waiting for Triage', value: stats?.waiting_triage || 0, icon: 'bi-clock-history', color: 'warning' },
     { label: 'In Consultation', value: stats?.in_consultation || 0, icon: 'bi-person-workspace', color: 'info' },
     { label: 'Completed Today', value: stats?.completed_today || 0, icon: 'bi-check2-circle', color: 'success' }
