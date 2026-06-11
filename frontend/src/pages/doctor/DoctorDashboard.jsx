@@ -17,6 +17,12 @@ export default function DoctorDashboard() {
     loadDashboardData()
   }, [])
 
+  const normalizeList = (data) => {
+    if (Array.isArray(data)) return data
+    if (data && Array.isArray(data.results)) return data.results
+    return []
+  }
+
   const loadDashboardData = async () => {
     try {
       const [statsData, queueData, appointmentsData, labData] = await Promise.all([
@@ -26,9 +32,9 @@ export default function DoctorDashboard() {
         labOrdersAPI.list({ status: 'REPORTED' })
       ])
       setStats(statsData)
-      setQueue(queueData)
-      setTodayAppointments(appointmentsData)
-      setPendingResults(labData)
+      setQueue(normalizeList(queueData))
+      setTodayAppointments(normalizeList(appointmentsData))
+      setPendingResults(normalizeList(labData))
     } catch (err) {
       console.error('Failed to load dashboard', err)
     } finally {
