@@ -80,11 +80,11 @@ const GoodsReceived         = lazy(() => import('./pages/procurement/GoodsReceiv
 const SuppliersPage         = lazy(() => import('./pages/procurement/SuppliersPage'))
 
 // Accountant
-const AccountantDashboard = lazy(() => import('./pages/hr/AccountantDashboard'))
-const ETIMSInvoices       = lazy(() => import('./pages/hr/ETIMSInvoices'))
-const ETIMSConfig         = lazy(() => import('./pages/hr/ETIMSConfig'))
-const AccountantPayments  = lazy(() => import('./pages/hr/AccountantPayments'))
-const AccountantReports   = lazy(() => import('./pages/hr/AccountantReports'))
+const AccountantDashboard = lazy(() => import('./pages/accountant/AccountantDashboard'))
+const ETIMSInvoices       = lazy(() => import('./pages/accountant/ETIMSInvoices'))
+const ETIMSConfig         = lazy(() => import('./pages/accountant/ETIMSConfig'))
+const AccountantPayments  = lazy(() => import('./pages/accountant/AccountantPayments'))
+const AccountantReports   = lazy(() => import('./pages/accountant/AccountantReports'))
 
 // HR
 const HRDashboard       = lazy(() => import('./pages/hr/HRDashboard'))

@@ -39,6 +39,3 @@ urlpatterns = [
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 
-# ── Custom 404 / 500 handlers ─────────────────────────────────────────────────
-handler404 = 'afya1.views.error_404'
-handler500 = 'afya1.views.error_500'

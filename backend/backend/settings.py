@@ -85,7 +85,7 @@ MIDDLEWARE = [
 
 # ── URL & WSGI ────────────────────────────────────────────────────────────────
 
-ROOT_URLCONF = 'afya1.urls'
+ROOT_URLCONF = 'backend.urls'
 WSGI_APPLICATION = 'backend.wsgi.application'
 ASGI_APPLICATION = 'backend.asgi.application'
 
@@ -113,16 +113,8 @@ TEMPLATES = [
 
 DATABASES = {
     'default': {
-        'ENGINE':   'django.db.backends.postgresql',
-        'NAME':     config('DB_NAME',     default='afya1_hmis'),
-        'USER':     config('DB_USER',     default='postgres'),
-        'PASSWORD': config('DB_PASSWORD', default='postgres'),
-        'HOST':     config('DB_HOST',     default='localhost'),
-        'PORT':     config('DB_PORT',     default='5432'),
-        'OPTIONS': {
-            'connect_timeout': 10,
-        },
-        'CONN_MAX_AGE': config('DB_CONN_MAX_AGE', default=60, cast=int),
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
@@ -528,30 +520,4 @@ ADMIN_SITE_TITLE   = 'AFYA1 HMIS Admin'
 ADMIN_INDEX_TITLE  = 'Hospital Management Portal'
 
 
-# ── Django Admin Branding ─────────────────────────────────────────────────────
-
-from django.contrib import admin as _admin
-_admin.site.site_header  = ADMIN_SITE_HEADER
-_admin.site.site_title   = ADMIN_SITE_TITLE
-_admin.site.index_title  = ADMIN_INDEX_TITLE
-
-
-# ── Development Overrides ─────────────────────────────────────────────────────
-
-if DEBUG:
-    # Django Debug Toolbar (install separately: pip install django-debug-toolbar)
-    try:
-        import debug_toolbar  # noqa
-        INSTALLED_APPS  += ['debug_toolbar']
-        MIDDLEWARE       = ['debug_toolbar.middleware.DebugToolbarMiddleware'] + MIDDLEWARE
-        INTERNAL_IPS     = ['127.0.0.1', 'localhost']
-    except ImportError:
-        pass
-
-    # Relax throttling in dev
-    REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'] = {
-        'anon':  '10000/hour',
-        'user':  '100000/hour',
-        'login': '1000/minute',
-    }
 
