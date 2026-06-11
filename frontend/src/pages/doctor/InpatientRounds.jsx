@@ -21,10 +21,16 @@ export default function InpatientRounds() {
     loadAdmissions()
   }, [])
 
+  const normalizeList = (data) => {
+    if (Array.isArray(data)) return data
+    if (data && Array.isArray(data.results)) return data.results
+    return []
+  }
+
   const loadAdmissions = async () => {
     try {
       const data = await admissionsAPI.active()
-      setAdmissions(data)
+      setAdmissions(normalizeList(data))
     } catch (err) {
       console.error('Failed to load admissions', err)
     } finally {
@@ -159,7 +165,7 @@ export default function InpatientRounds() {
               <h3 className="card-title">Recent Vitals</h3>
             </div>
             <div className="card-body">
-              {selectedAdmission.vital_signs?.length === 0 ? (
+              {!selectedAdmission.vital_signs?.length ? (
                 <div className="empty-state"><p>No vital signs recorded</p></div>
               ) : (
                 <div className="table-wrapper">
@@ -168,7 +174,7 @@ export default function InpatientRounds() {
                       <tr><th>Time</th><th>Temp</th><th>BP</th><th>Pulse</th><th>RR</th><th>SpO2</th><th>Pain</th><th>Recorded By</th></tr>
                     </thead>
                     <tbody>
-                      {selectedAdmission.vital_signs?.slice(0, 5).map((vitals) => (
+                      {normalizeList(selectedAdmission.vital_signs).slice(0, 5).map((vitals) => (
                         <tr key={vitals.id}>
                           <td>{new Date(vitals.recorded_at).toLocaleString()}</td>
                           <td>{vitals.temperature || '-'}°C</td>
@@ -200,7 +206,7 @@ export default function InpatientRounds() {
                   <i className="bi bi-plus"></i> Add Procedure
                 </button>
               </div>
-              {selectedAdmission.daily_charges?.length === 0 ? (
+              {!selectedAdmission.daily_charges?.length ? (
                 <div className="empty-state"><p>No charges recorded</p></div>
               ) : (
                 <div className="table-wrapper">
@@ -209,12 +215,12 @@ export default function InpatientRounds() {
                       <tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th><th>Status</th></tr>
                     </thead>
                     <tbody>
-                      {selectedAdmission.daily_charges?.map((charge) => (
+                      {normalizeList(selectedAdmission.daily_charges).map((charge) => (
                         <tr key={charge.id}>
                           <td>{new Date(charge.charge_date).toLocaleDateString()}</td>
                           <td>{charge.charge_type_display}</td>
                           <td>{charge.description}</td>
-                          <td>KES {charge.total_amount}</td>
+                          <td>KES {charge.total_amount?.toLocaleString()}</td>
                           <td>{charge.is_paid ? <span className="badge badge-success">Paid</span> : <span className="badge badge-warning">Pending</span>}</td>
                         </tr>
                       ))}
@@ -225,15 +231,15 @@ export default function InpatientRounds() {
               <div className="divider"></div>
               <div className="flex justify-between">
                 <span className="font-bold">Total Charges:</span>
-                <span className="font-bold">KES {selectedAdmission.total_charges}</span>
+                <span className="font-bold">KES {selectedAdmission.total_charges?.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span>Amount Paid:</span>
-                <span>KES {selectedAdmission.amount_paid}</span>
+                <span>KES {selectedAdmission.amount_paid?.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-danger">Outstanding Balance:</span>
-                <span className="text-danger">KES {selectedAdmission.outstanding_balance}</span>
+                <span className="text-danger">KES {selectedAdmission.outstanding_balance?.toLocaleString()}</span>
               </div>
             </div>
           </div>

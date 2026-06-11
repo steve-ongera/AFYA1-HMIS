@@ -1,7 +1,7 @@
 // pages/doctor/ConsultQueue.jsx
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { queueAPI, visitsAPI, consultationsAPI, prescriptionsAPI, labOrdersAPI, icd10API } from '../../services/api'
+import { queueAPI, visitsAPI, consultationsAPI, prescriptionsAPI, labOrdersAPI, icd10API, appointmentsAPI } from '../../services/api'
 
 export default function ConsultQueue() {
   const navigate = useNavigate()
@@ -9,7 +9,7 @@ export default function ConsultQueue() {
   const queryParams = new URLSearchParams(location.search)
   const selectedVisitId = queryParams.get('visit')
   const appointmentId = queryParams.get('appointment')
-  
+
   const [queue, setQueue] = useState([])
   const [selectedVisit, setSelectedVisit] = useState(null)
   const [consultation, setConsultation] = useState(null)
@@ -26,7 +26,15 @@ export default function ConsultQueue() {
     follow_up_date: '',
     follow_up_notes: ''
   })
-  const [newPrescription, setNewPrescription] = useState({ medicine: '', quantity: '', dosage_text: '', duration: '', instructions: '', is_insured: false })
+  const [newPrescription, setNewPrescription] = useState({
+    medicine: '', quantity: '', dosage_text: '', duration: '', instructions: '', is_insured: false
+  })
+
+  const normalizeList = (data) => {
+    if (Array.isArray(data)) return data
+    if (data && Array.isArray(data.results)) return data.results
+    return []
+  }
 
   useEffect(() => {
     loadQueue()
@@ -43,7 +51,7 @@ export default function ConsultQueue() {
   const loadQueue = async () => {
     try {
       const data = await queueAPI.byDept('CONSULTATION')
-      setQueue(data)
+      setQueue(normalizeList(data))
     } catch (err) {
       console.error('Failed to load queue', err)
     } finally {
@@ -55,8 +63,7 @@ export default function ConsultQueue() {
     try {
       const data = await visitsAPI.get(id)
       setSelectedVisit(data)
-      
-      // Check if consultation exists
+
       if (data.consultation) {
         const consData = await consultationsAPI.get(data.consultation)
         setConsultation(consData)
@@ -64,16 +71,16 @@ export default function ConsultQueue() {
           consultationsAPI.prescriptions(consData.id),
           consultationsAPI.labOrders(consData.id)
         ])
-        setPrescriptions(rxData)
-        setLabOrders(labData)
+        setPrescriptions(normalizeList(rxData))
+        setLabOrders(normalizeList(labData))
         setFormData({
-          diagnosis: consData.diagnosis,
-          notes: consData.notes,
-          follow_up_date: consData.follow_up_date,
-          follow_up_notes: consData.follow_up_notes
+          diagnosis: consData.diagnosis || '',
+          notes: consData.notes || '',
+          follow_up_date: consData.follow_up_date || '',
+          follow_up_notes: consData.follow_up_notes || ''
         })
         if (consData.icd10_diagnoses) {
-          setDiagnoses(consData.icd10_diagnoses)
+          setDiagnoses(normalizeList(consData.icd10_diagnoses))
         }
       }
     } catch (err) {
@@ -82,7 +89,6 @@ export default function ConsultQueue() {
   }
 
   const loadAppointment = async (id) => {
-    // Similar to loadVisit - would fetch appointment and create visit
     console.log('Load appointment', id)
   }
 
@@ -90,7 +96,7 @@ export default function ConsultQueue() {
     if (icd10Search.length < 2) return
     try {
       const data = await icd10API.search(icd10Search)
-      setIcd10Results(data)
+      setIcd10Results(normalizeList(data))
     } catch (err) {
       console.error('Failed to search ICD10', err)
     }
@@ -106,7 +112,7 @@ export default function ConsultQueue() {
         clinical_notes: ''
       })
       const consData = await consultationsAPI.get(consultation.id)
-      setDiagnoses(consData.icd10_diagnoses)
+      setDiagnoses(normalizeList(consData.icd10_diagnoses))
       setIcd10Search('')
       setIcd10Results([])
     } catch (err) {
@@ -122,8 +128,9 @@ export default function ConsultQueue() {
         ...newPrescription
       })
       const rxData = await consultationsAPI.prescriptions(consultation.id)
-      setPrescriptions(rxData)
+      setPrescriptions(normalizeList(rxData))
       setNewPrescription({ medicine: '', quantity: '', dosage_text: '', duration: '', instructions: '', is_insured: false })
+      document.getElementById('prescription-form').style.display = 'none'
     } catch (err) {
       console.error('Failed to add prescription', err)
     }
@@ -140,7 +147,7 @@ export default function ConsultQueue() {
         test_items: [{ test: testId }]
       })
       const labData = await consultationsAPI.labOrders(consultation.id)
-      setLabOrders(labData)
+      setLabOrders(normalizeList(labData))
     } catch (err) {
       console.error('Failed to order lab test', err)
     }
@@ -150,9 +157,7 @@ export default function ConsultQueue() {
     if (!selectedVisit) return
     setConsulting(true)
     try {
-      let consId = consultation?.id
       if (!consultation) {
-        // Create new consultation
         const appointment = await appointmentsAPI.create({
           patient: selectedVisit.patient,
           doctor: selectedVisit.assigned_doctor,
@@ -167,15 +172,15 @@ export default function ConsultQueue() {
           follow_up_date: formData.follow_up_date,
           follow_up_notes: formData.follow_up_notes
         })
-        consId = newCons.id
         setConsultation(newCons)
       } else {
         await consultationsAPI.update(consultation.id, formData)
       }
-      
+
       await visitsAPI.updateStatus(selectedVisit.id, { status: 'COMPLETED' })
-      await queueAPI.complete(queue.find(q => q.visit === selectedVisit.id)?.id)
-      
+      const queueItem = queue.find(q => q.visit === selectedVisit.id || q.visit === parseInt(selectedVisit.id))
+      if (queueItem) await queueAPI.complete(queueItem.id)
+
       navigate(`/shared/visit/${selectedVisit.id}`)
     } catch (err) {
       console.error('Failed to save consultation', err)
@@ -245,7 +250,10 @@ export default function ConsultQueue() {
                 <div className="info-item"><div className="info-label">Age/Gender</div><div className="info-value">{selectedVisit.patient_info?.age} / {selectedVisit.patient_info?.gender}</div></div>
                 <div className="info-item"><div className="info-label">Chief Complaint</div><div className="info-value">{selectedVisit.chief_complaint}</div></div>
                 {selectedVisit.triage && (
-                  <div className="info-item"><div className="info-label">Triage</div><div className="info-value">Category: {selectedVisit.triage?.category_info?.name} • Pain: {selectedVisit.triage?.pain_score}/10</div></div>
+                  <div className="info-item">
+                    <div className="info-label">Triage</div>
+                    <div className="info-value">Category: {selectedVisit.triage?.category_info?.name} • Pain: {selectedVisit.triage?.pain_score}/10</div>
+                  </div>
                 )}
               </div>
             </div>
@@ -265,7 +273,14 @@ export default function ConsultQueue() {
                 <label className="form-label">ICD-10 Codes</label>
                 <div className="search-wrapper">
                   <i className="bi bi-search search-icon"></i>
-                  <input type="text" className="form-input" placeholder="Search ICD-10 codes..." value={icd10Search} onChange={(e) => setIcd10Search(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), searchICD10())} />
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Search ICD-10 codes..."
+                    value={icd10Search}
+                    onChange={(e) => setIcd10Search(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), searchICD10())}
+                  />
                 </div>
                 {icd10Results.length > 0 && (
                   <div className="table-wrapper" style={{ marginTop: 8 }}>
@@ -313,7 +328,9 @@ export default function ConsultQueue() {
           <div className="card" style={{ marginBottom: 24 }}>
             <div className="card-header">
               <h3 className="card-title">Prescriptions</h3>
-              <button className="btn btn-sm btn-primary" onClick={() => document.getElementById('prescription-form').style.display = 'block'}>Add Prescription</button>
+              <button className="btn btn-sm btn-primary" onClick={() => document.getElementById('prescription-form').style.display = 'block'}>
+                Add Prescription
+              </button>
             </div>
             <div className="card-body">
               <div id="prescription-form" style={{ display: 'none', marginBottom: 16 }}>
@@ -327,14 +344,16 @@ export default function ConsultQueue() {
                   <div className="form-group"><label>Instructions</label><input type="text" className="form-input" value={newPrescription.instructions} onChange={(e) => setNewPrescription(prev => ({ ...prev, instructions: e.target.value }))} placeholder="e.g., Take after meals" /></div>
                 </div>
                 <div className="form-group">
-                  <label className="form-checkbox"><input type="checkbox" checked={newPrescription.is_insured} onChange={(e) => setNewPrescription(prev => ({ ...prev, is_insured: e.target.checked }))} /> Insurance Claim</label>
+                  <label className="form-checkbox">
+                    <input type="checkbox" checked={newPrescription.is_insured} onChange={(e) => setNewPrescription(prev => ({ ...prev, is_insured: e.target.checked }))} /> Insurance Claim
+                  </label>
                 </div>
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                   <button type="button" className="btn btn-secondary btn-sm" onClick={() => document.getElementById('prescription-form').style.display = 'none'}>Cancel</button>
                   <button type="button" className="btn btn-primary btn-sm" onClick={addPrescription}>Add</button>
                 </div>
               </div>
-              
+
               {prescriptions.length === 0 ? (
                 <div className="empty-state"><p>No prescriptions added</p></div>
               ) : (
@@ -343,7 +362,13 @@ export default function ConsultQueue() {
                     <thead><tr><th>Medicine</th><th>Quantity</th><th>Dosage</th><th>Duration</th><th>Status</th></tr></thead>
                     <tbody>
                       {prescriptions.map(rx => (
-                        <tr key={rx.id}><td>{rx.medicine_info?.name}</td><td>{rx.quantity}</td><td>{rx.dosage_text}</td><td>{rx.duration}</td><td>{rx.is_dispensed ? 'Dispensed' : 'Pending'}</td></tr>
+                        <tr key={rx.id}>
+                          <td>{rx.medicine_info?.name}</td>
+                          <td>{rx.quantity}</td>
+                          <td>{rx.dosage_text}</td>
+                          <td>{rx.duration}</td>
+                          <td>{rx.is_dispensed ? 'Dispensed' : 'Pending'}</td>
+                        </tr>
                       ))}
                     </tbody>
                   </table>
@@ -376,14 +401,16 @@ export default function ConsultQueue() {
                   </table>
                 </div>
               )}
-              <button className="btn btn-secondary btn-sm">Order Lab Test</button>
+              <button className="btn btn-secondary btn-sm" style={{ marginTop: 12 }}>Order Lab Test</button>
             </div>
           </div>
 
           <div className="card-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
             <button className="btn btn-secondary" onClick={() => setSelectedVisit(null)}>Save Draft</button>
             <button className="btn btn-primary" onClick={saveConsultation} disabled={consulting}>
-              {consulting ? <><span className="spinner" style={{ width: 16, height: 16 }}></span> Saving...</> : 'Complete Consultation'}
+              {consulting
+                ? <><span className="spinner" style={{ width: 16, height: 16 }}></span> Saving...</>
+                : 'Complete Consultation'}
             </button>
           </div>
         </div>
