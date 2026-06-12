@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import { dashboardAPI, prescriptionsAPI, medicinesAPI, otcAPI } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 
+const toArray = (data) => Array.isArray(data) ? data : (data?.results ?? [])
+
 export default function PharmacyDashboard() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -26,9 +28,9 @@ export default function PharmacyDashboard() {
         otcAPI.list({ today: true })
       ])
       setStats(statsData)
-      setPendingPrescriptions(rxData)
-      setLowStock(stockData)
-      setRecentSales(salesData)
+      setPendingPrescriptions(toArray(rxData))
+      setLowStock(toArray(stockData))
+      setRecentSales(toArray(salesData))
     } catch (err) {
       console.error('Failed to load dashboard', err)
     } finally {
