@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { labOrdersAPI, labResultsAPI } from '../../services/api'
 
+const unwrap = (data) => Array.isArray(data) ? data : (data?.results ?? [])
+
 export default function DoctorLabResults() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -22,7 +24,7 @@ export default function DoctorLabResults() {
   const loadOrders = async () => {
     try {
       const data = await labOrdersAPI.list({ status: 'REPORTED' })
-      setOrders(data)
+      setOrders(unwrap(data))
     } catch (err) {
       console.error('Failed to load lab orders', err)
     } finally {
@@ -37,7 +39,7 @@ export default function DoctorLabResults() {
         labResultsAPI.list({ lab_order: orderId })
       ])
       setSelectedOrder(orderData)
-      setResult(resultData[0])
+      setResult(unwrap(resultData)[0] ?? null)
     } catch (err) {
       console.error('Failed to load order details', err)
     } finally {
@@ -46,7 +48,6 @@ export default function DoctorLabResults() {
   }
 
   const markAsReviewed = async () => {
-    // In production, mark result as reviewed by doctor
     navigate('/doctor/lab-results')
   }
 
@@ -85,11 +86,30 @@ export default function DoctorLabResults() {
           </div>
           <div className="card-body">
             <div className="info-grid">
-              <div className="info-item"><div className="info-label">Order #</div><div className="info-value">{selectedOrder.order_number}</div></div>
-              <div className="info-item"><div className="info-label">Ordered By</div><div className="info-value">{selectedOrder.ordered_by_name}</div></div>
-              <div className="info-item"><div className="info-label">Ordered At</div><div className="info-value">{new Date(selectedOrder.ordered_at).toLocaleString()}</div></div>
-              <div className="info-item"><div className="info-label">Priority</div><div className="info-value"><span className={`badge ${selectedOrder.priority === 'URGENT' ? 'badge-danger' : 'badge-neutral'}`}>{selectedOrder.priority_display}</span></div></div>
-              <div className="info-item"><div className="info-label">Clinical Notes</div><div className="info-value">{selectedOrder.clinical_notes || 'None'}</div></div>
+              <div className="info-item">
+                <div className="info-label">Order #</div>
+                <div className="info-value">{selectedOrder.order_number}</div>
+              </div>
+              <div className="info-item">
+                <div className="info-label">Ordered By</div>
+                <div className="info-value">{selectedOrder.ordered_by_name}</div>
+              </div>
+              <div className="info-item">
+                <div className="info-label">Ordered At</div>
+                <div className="info-value">{new Date(selectedOrder.ordered_at).toLocaleString()}</div>
+              </div>
+              <div className="info-item">
+                <div className="info-label">Priority</div>
+                <div className="info-value">
+                  <span className={`badge ${selectedOrder.priority === 'URGENT' ? 'badge-danger' : 'badge-neutral'}`}>
+                    {selectedOrder.priority_display}
+                  </span>
+                </div>
+              </div>
+              <div className="info-item">
+                <div className="info-label">Clinical Notes</div>
+                <div className="info-value">{selectedOrder.clinical_notes || 'None'}</div>
+              </div>
             </div>
           </div>
         </div>
@@ -105,7 +125,12 @@ export default function DoctorLabResults() {
                 <div className="table-wrapper">
                   <table className="table">
                     <thead>
-                      <tr><th>Test</th><th>Result</th><th>Normal Range</th><th>Status</th></tr>
+                      <tr>
+                        <th>Test</th>
+                        <th>Result</th>
+                        <th>Normal Range</th>
+                        <th>Status</th>
+                      </tr>
                     </thead>
                     <tbody>
                       {selectedOrder.test_items?.map((item) => (
@@ -113,7 +138,12 @@ export default function DoctorLabResults() {
                           <td>{item.test_info?.test_name}</td>
                           <td>{item.result_value || 'Pending'}</td>
                           <td>{item.test_info?.normal_range || '-'}</td>
-                          <td>{item.is_abnormal ? <span className="badge badge-danger">Abnormal</span> : <span className="badge badge-success">Normal</span>}</td>
+                          <td>
+                            {item.is_abnormal
+                              ? <span className="badge badge-danger">Abnormal</span>
+                              : <span className="badge badge-success">Normal</span>
+                            }
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -176,7 +206,14 @@ export default function DoctorLabResults() {
             <div className="table-wrapper">
               <table className="table">
                 <thead>
-                  <tr><th>Order #</th><th>Patient</th><th>Ordered</th><th>Completed</th><th>Critical</th><th>Actions</th></tr>
+                  <tr>
+                    <th>Order #</th>
+                    <th>Patient</th>
+                    <th>Ordered</th>
+                    <th>Completed</th>
+                    <th>Critical</th>
+                    <th>Actions</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {orders.map((order) => (
@@ -185,9 +222,17 @@ export default function DoctorLabResults() {
                       <td>{order.patient_name}</td>
                       <td>{new Date(order.ordered_at).toLocaleDateString()}</td>
                       <td>{order.completed_at ? new Date(order.completed_at).toLocaleDateString() : '-'}</td>
-                      <td>{order.result?.is_critical ? <span className="badge badge-danger">Yes</span> : <span className="badge badge-success">No</span>}</td>
                       <td>
-                        <button className="btn btn-sm btn-primary" onClick={() => navigate(`/doctor/lab-results/${order.id}`)}>
+                        {order.result?.is_critical
+                          ? <span className="badge badge-danger">Yes</span>
+                          : <span className="badge badge-success">No</span>
+                        }
+                      </td>
+                      <td>
+                        <button
+                          className="btn btn-sm btn-primary"
+                          onClick={() => navigate(`/doctor/lab-results/${order.id}`)}
+                        >
                           <i className="bi bi-eye"></i> View
                         </button>
                       </td>
