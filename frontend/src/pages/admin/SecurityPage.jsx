@@ -6,19 +6,22 @@ export default function SecurityPage() {
   const [threats, setThreats] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
+  const [resolutionNotes, setResolutionNotes] = useState('')
+  const [resolvingId, setResolvingId] = useState(null)
 
   useEffect(() => {
     loadThreats()
   }, [filter])
 
   const loadThreats = async () => {
+    setLoading(true)
     try {
       const params = {}
       if (filter === 'active') params.resolved = false
       else if (filter === 'resolved') params.resolved = true
-      
+
       const data = await auditAPI.threats(params)
-      setThreats(data)
+      setThreats(Array.isArray(data) ? data : (data.results || []))
     } catch (err) {
       console.error('Failed to load threats', err)
     } finally {
@@ -28,7 +31,9 @@ export default function SecurityPage() {
 
   const resolveThreat = async (id) => {
     try {
-      await auditAPI.resolveThreat(id, { notes: prompt('Resolution notes:') })
+      await auditAPI.resolveThreat(id, { notes: resolutionNotes })
+      setResolvingId(null)
+      setResolutionNotes('')
       loadThreats()
     } catch (err) {
       console.error('Failed to resolve threat', err)
@@ -66,6 +71,38 @@ export default function SecurityPage() {
         <button className={`tab-btn ${filter === 'resolved' ? 'active' : ''}`} onClick={() => setFilter('resolved')}>Resolved</button>
       </div>
 
+      {/* Resolve Modal */}
+      {resolvingId && (
+        <div className="modal-overlay" onClick={() => setResolvingId(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Resolve Threat</h3>
+              <button className="modal-close" onClick={() => setResolvingId(null)}>
+                <i className="bi bi-x-lg"></i>
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label className="form-label">Resolution Notes</label>
+                <textarea
+                  className="form-input"
+                  rows={4}
+                  placeholder="Describe how this threat was resolved..."
+                  value={resolutionNotes}
+                  onChange={(e) => setResolutionNotes(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setResolvingId(null)}>Cancel</button>
+              <button className="btn btn-primary" onClick={() => resolveThreat(resolvingId)}>
+                Confirm Resolve
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="card">
         <div className="card-body">
           {threats.length === 0 ? (
@@ -77,26 +114,42 @@ export default function SecurityPage() {
             <div className="table-wrapper">
               <table className="table">
                 <thead>
-                  <tr><th>Detected</th><th>Type</th><th>Severity</th><th>IP Address</th><th>User</th><th>Description</th><th>Status</th><th>Actions</th></tr>
+                  <tr>
+                    <th>Detected</th>
+                    <th>Type</th>
+                    <th>Severity</th>
+                    <th>IP Address</th>
+                    <th>User</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {threats.map((threat) => (
                     <tr key={threat.id}>
                       <td>{new Date(threat.detected_at).toLocaleString()}</td>
                       <td>{threat.threat_type_display}</td>
-                      <td><span className={`badge ${getSeverityBadge(threat.severity)}`}>{threat.severity}</span></td>
+                      <td>
+                        <span className={`badge ${getSeverityBadge(threat.severity)}`}>
+                          {threat.severity}
+                        </span>
+                      </td>
                       <td>{threat.ip_address}</td>
                       <td>{threat.user?.full_name || 'Unknown'}</td>
                       <td>{threat.description}</td>
                       <td>
-                        {threat.resolved ? 
-                          <span className="badge badge-success">Resolved</span> : 
-                          <span className="badge badge-danger">Active</span>
+                        {threat.resolved
+                          ? <span className="badge badge-success">Resolved</span>
+                          : <span className="badge badge-danger">Active</span>
                         }
                       </td>
                       <td>
                         {!threat.resolved && (
-                          <button className="btn btn-sm btn-primary" onClick={() => resolveThreat(threat.id)}>
+                          <button
+                            className="btn btn-sm btn-primary"
+                            onClick={() => setResolvingId(threat.id)}
+                          >
                             Resolve
                           </button>
                         )}
