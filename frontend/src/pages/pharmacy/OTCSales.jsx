@@ -2,6 +2,15 @@
 import React, { useState, useEffect } from 'react'
 import { otcAPI, medicinesAPI } from '../../services/api'
 
+// Normalize API responses that may be a plain array or a paginated DRF response
+const toArray = (data) => {
+  if (Array.isArray(data)) return data
+  if (data && Array.isArray(data.results)) return data.results
+  if (data && Array.isArray(data.data)) return data.data
+  console.warn('Unexpected list response shape:', data)
+  return []
+}
+
 export default function OTCSales() {
   const [sales, setSales] = useState([])
   const [medicines, setMedicines] = useState([])
@@ -26,10 +35,12 @@ export default function OTCSales() {
         otcAPI.list(),
         medicinesAPI.list()
       ])
-      setSales(salesData)
-      setMedicines(medicinesData)
+      setSales(toArray(salesData))
+      setMedicines(toArray(medicinesData))
     } catch (err) {
       console.error('Failed to load data', err)
+      setSales([])
+      setMedicines([])
     } finally {
       setLoading(false)
     }
@@ -43,7 +54,7 @@ export default function OTCSales() {
     if (existing) {
       setCart(cart.map(item => 
         item.id === medicine.id 
-          ? { ...item, quantity: item.quantity + selectedMedicine.quantity }
+          ? { ...item, quantity: item.quantity + selectedMedicine.quantity, subtotal: (item.quantity + selectedMedicine.quantity) * item.price }
           : item
       ))
     } else {
