@@ -25,13 +25,14 @@ export default function DoctorAppointments() {
   }, [filter])
 
   const loadAppointments = async () => {
+    setLoading(true)
     try {
       let params = { my: true }
       if (filter === 'today') params.today = true
       else if (filter === 'upcoming') params.date__gte = new Date().toISOString().split('T')[0]
-      
+
       const data = await appointmentsAPI.list(params)
-      setAppointments(data)
+      setAppointments(Array.isArray(data) ? data : (data.results || []))
     } catch (err) {
       console.error('Failed to load appointments', err)
     } finally {
@@ -42,7 +43,7 @@ export default function DoctorAppointments() {
   const loadPatients = async () => {
     try {
       const data = await patientsAPI.list({ limit: 100 })
-      setPatients(data)
+      setPatients(Array.isArray(data) ? data : (data.results || []))
     } catch (err) {
       console.error('Failed to load patients', err)
     }
@@ -74,7 +75,13 @@ export default function DoctorAppointments() {
   }
 
   const getStatusBadge = (status) => {
-    const badges = { SCHEDULED: 'badge-primary', IN_PROGRESS: 'badge-warning', COMPLETED: 'badge-success', CANCELLED: 'badge-danger', NO_SHOW: 'badge-neutral' }
+    const badges = {
+      SCHEDULED: 'badge-primary',
+      IN_PROGRESS: 'badge-warning',
+      COMPLETED: 'badge-success',
+      CANCELLED: 'badge-danger',
+      NO_SHOW: 'badge-neutral'
+    }
     return badges[status] || 'badge-neutral'
   }
 
@@ -118,7 +125,13 @@ export default function DoctorAppointments() {
             <div className="table-wrapper">
               <table className="table">
                 <thead>
-                  <tr><th>Date & Time</th><th>Patient</th><th>Reason</th><th>Status</th><th>Actions</th></tr>
+                  <tr>
+                    <th>Date & Time</th>
+                    <th>Patient</th>
+                    <th>Reason</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {appointments.map((apt) => (
@@ -126,20 +139,33 @@ export default function DoctorAppointments() {
                       <td>{new Date(apt.scheduled_time).toLocaleString()}</td>
                       <td>{apt.patient_name}</td>
                       <td>{apt.reason}</td>
-                      <td><span className={`badge ${getStatusBadge(apt.status)}`}>{apt.status_display}</span></td>
+                      <td>
+                        <span className={`badge ${getStatusBadge(apt.status)}`}>
+                          {apt.status_display}
+                        </span>
+                      </td>
                       <td>
                         {apt.status === 'SCHEDULED' && (
                           <>
-                            <button className="btn btn-sm btn-primary" onClick={() => navigate(`/doctor/queue?appointment=${apt.id}`)}>
+                            <button
+                              className="btn btn-sm btn-primary"
+                              onClick={() => navigate(`/doctor/queue?appointment=${apt.id}`)}
+                            >
                               <i className="bi bi-play-fill"></i> Start
                             </button>
-                            <button className="btn btn-sm btn-danger" onClick={() => updateStatus(apt.id, 'CANCELLED')}>
+                            <button
+                              className="btn btn-sm btn-danger"
+                              onClick={() => updateStatus(apt.id, 'CANCELLED')}
+                            >
                               <i className="bi bi-x-circle"></i> Cancel
                             </button>
                           </>
                         )}
                         {apt.status === 'IN_PROGRESS' && (
-                          <button className="btn btn-sm btn-success" onClick={() => navigate(`/doctor/queue?appointment=${apt.id}`)}>
+                          <button
+                            className="btn btn-sm btn-success"
+                            onClick={() => navigate(`/doctor/queue?appointment=${apt.id}`)}
+                          >
                             <i className="bi bi-arrow-right"></i> Continue
                           </button>
                         )}
@@ -165,22 +191,46 @@ export default function DoctorAppointments() {
               <div className="modal-body">
                 <div className="form-group">
                   <label className="form-label required">Patient</label>
-                  <select className="form-select" required value={formData.patient} onChange={(e) => setFormData(prev => ({ ...prev, patient: e.target.value }))}>
+                  <select
+                    className="form-select"
+                    required
+                    value={formData.patient}
+                    onChange={(e) => setFormData(prev => ({ ...prev, patient: e.target.value }))}
+                  >
                     <option value="">Select patient...</option>
-                    {patients.map(p => <option key={p.id} value={p.id}>{p.full_name} ({p.phone_number})</option>)}
+                    {patients.map(p => (
+                      <option key={p.id} value={p.id}>{p.full_name} ({p.phone_number})</option>
+                    ))}
                   </select>
                 </div>
                 <div className="form-group">
                   <label className="form-label required">Date & Time</label>
-                  <input type="datetime-local" className="form-input" required value={formData.scheduled_time} onChange={(e) => setFormData(prev => ({ ...prev, scheduled_time: e.target.value }))} />
+                  <input
+                    type="datetime-local"
+                    className="form-input"
+                    required
+                    value={formData.scheduled_time}
+                    onChange={(e) => setFormData(prev => ({ ...prev, scheduled_time: e.target.value }))}
+                  />
                 </div>
                 <div className="form-group">
                   <label className="form-label required">Reason</label>
-                  <textarea className="form-textarea" rows="2" required value={formData.reason} onChange={(e) => setFormData(prev => ({ ...prev, reason: e.target.value }))}></textarea>
+                  <textarea
+                    className="form-textarea"
+                    rows="2"
+                    required
+                    value={formData.reason}
+                    onChange={(e) => setFormData(prev => ({ ...prev, reason: e.target.value }))}
+                  ></textarea>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Symptoms</label>
-                  <textarea className="form-textarea" rows="2" value={formData.symptoms} onChange={(e) => setFormData(prev => ({ ...prev, symptoms: e.target.value }))}></textarea>
+                  <textarea
+                    className="form-textarea"
+                    rows="2"
+                    value={formData.symptoms}
+                    onChange={(e) => setFormData(prev => ({ ...prev, symptoms: e.target.value }))}
+                  ></textarea>
                 </div>
               </div>
               <div className="modal-footer">

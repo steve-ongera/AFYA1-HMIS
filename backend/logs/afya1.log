@@ -733,3 +733,12 @@ INFO 2026-06-12 16:55:56,349 basehttp 3872 9416 "OPTIONS /api/assets/ HTTP/1.1" 
 INFO 2026-06-12 16:55:56,349 basehttp 3872 9440 "OPTIONS /api/assets/ HTTP/1.1" 200 0
 INFO 2026-06-12 16:55:56,610 basehttp 3872 9440 "GET /api/assets/ HTTP/1.1" 200 9955
 INFO 2026-06-12 16:55:56,666 basehttp 3872 9416 "GET /api/assets/ HTTP/1.1" 200 9955
+INFO 2026-06-12 16:57:28,563 basehttp 3872 9440 "POST /api/auth/refresh/ HTTP/1.1" 200 270
+INFO 2026-06-12 16:57:28,566 basehttp 3872 9416 "POST /api/auth/refresh/ HTTP/1.1" 200 270
+INFO 2026-06-12 16:57:28,601 basehttp 3872 9416 "GET /api/auth/me/ HTTP/1.1" 200 244
+INFO 2026-06-12 16:57:28,611 basehttp 3872 9440 "GET /api/auth/me/ HTTP/1.1" 200 244
+INFO 2026-06-12 16:57:28,943 basehttp 3872 9440 "GET /api/notifications/unread_count/ HTTP/1.1" 200 18
+INFO 2026-06-12 16:57:28,996 basehttp 3872 9416 "GET /api/assets/ HTTP/1.1" 200 9955
+INFO 2026-06-12 16:57:29,011 basehttp 3872 9432 "GET /api/notifications/unread_count/ HTTP/1.1" 200 18
+INFO 2026-06-12 16:57:29,061 basehttp 3872 9440 "GET /api/assets/ HTTP/1.1" 200 9955
+INFO 2026-06-12 16:57:29,299 basehttp 3872 9440 "GET /api/notifications/unread_count/ HTTP/1.1" 200 18
