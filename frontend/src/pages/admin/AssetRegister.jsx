@@ -25,7 +25,7 @@ export default function AssetRegister() {
   const loadAssets = async () => {
     try {
       const data = await assetsAPI.list()
-      setAssets(data)
+      setAssets(Array.isArray(data) ? data : (data.results || []))
     } catch (err) {
       console.error('Failed to load assets', err)
     } finally {
@@ -86,11 +86,24 @@ export default function AssetRegister() {
         <div className="card-header">
           <div className="search-wrapper" style={{ flex: 1 }}>
             <i className="bi bi-search search-icon"></i>
-            <input type="text" className="form-input" placeholder="Search assets..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            <input
+              type="text"
+              className="form-input"
+              placeholder="Search assets..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
-          <select className="form-select" style={{ width: 200 }} value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+          <select
+            className="form-select"
+            style={{ width: 200 }}
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+          >
             <option value="">All Categories</option>
-            {categories.map(c => <option key={c} value={c}>{c.replace('_', ' ')}</option>)}
+            {categories.map(c => (
+              <option key={c} value={c}>{c.replaceAll('_', ' ')}</option>
+            ))}
           </select>
         </div>
         <div className="card-body">
@@ -103,7 +116,15 @@ export default function AssetRegister() {
             <div className="table-wrapper">
               <table className="table">
                 <thead>
-                  <tr><th>Asset ID</th><th>Name</th><th>Category</th><th>Location</th><th>Status</th><th>Condition</th><th>Actions</th></tr>
+                  <tr>
+                    <th>Asset ID</th>
+                    <th>Name</th>
+                    <th>Category</th>
+                    <th>Location</th>
+                    <th>Status</th>
+                    <th>Condition</th>
+                    <th>Actions</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {filteredAssets.map((asset) => (
@@ -112,8 +133,16 @@ export default function AssetRegister() {
                       <td>{asset.asset_name}</td>
                       <td>{asset.category_display}</td>
                       <td>{asset.location}</td>
-                      <td><span className={`badge ${asset.status === 'OPERATIONAL' ? 'badge-success' : 'badge-warning'}`}>{asset.status_display}</span></td>
-                      <td><span className={`badge ${asset.condition === 'GOOD' ? 'badge-success' : asset.condition === 'POOR' ? 'badge-danger' : 'badge-warning'}`}>{asset.condition_display}</span></td>
+                      <td>
+                        <span className={`badge ${asset.status === 'OPERATIONAL' ? 'badge-success' : 'badge-warning'}`}>
+                          {asset.status_display}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`badge ${asset.condition === 'GOOD' ? 'badge-success' : asset.condition === 'POOR' ? 'badge-danger' : 'badge-warning'}`}>
+                          {asset.condition_display}
+                        </span>
+                      </td>
                       <td>
                         <button className="btn btn-sm btn-ghost" onClick={() => setSelectedAsset(asset)}>
                           <i className="bi bi-eye"></i> View
@@ -139,38 +168,76 @@ export default function AssetRegister() {
             <form onSubmit={handleCreate}>
               <div className="modal-body">
                 <div className="form-row">
-                  <div className="form-group"><label className="form-label required">Asset ID</label><input type="text" className="form-input" required value={formData.asset_id} onChange={(e) => setFormData(prev => ({ ...prev, asset_id: e.target.value }))} /></div>
-                  <div className="form-group"><label className="form-label required">Asset Name</label><input type="text" className="form-input" required value={formData.asset_name} onChange={(e) => setFormData(prev => ({ ...prev, asset_name: e.target.value }))} /></div>
+                  <div className="form-group">
+                    <label className="form-label required">Asset ID</label>
+                    <input type="text" className="form-input" required value={formData.asset_id} onChange={(e) => setFormData(prev => ({ ...prev, asset_id: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label required">Asset Name</label>
+                    <input type="text" className="form-input" required value={formData.asset_name} onChange={(e) => setFormData(prev => ({ ...prev, asset_name: e.target.value }))} />
+                  </div>
                 </div>
                 <div className="form-row">
-                  <div className="form-group"><label className="form-label">Category</label>
+                  <div className="form-group">
+                    <label className="form-label">Category</label>
                     <select className="form-select" value={formData.category} onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}>
-                      {categories.map(c => <option key={c} value={c}>{c.replace('_', ' ')}</option>)}
+                      {categories.map(c => <option key={c} value={c}>{c.replaceAll('_', ' ')}</option>)}
                     </select>
                   </div>
-                  <div className="form-group"><label className="form-label">Location</label><input type="text" className="form-input" value={formData.location} onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))} /></div>
+                  <div className="form-group">
+                    <label className="form-label">Location</label>
+                    <input type="text" className="form-input" value={formData.location} onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))} />
+                  </div>
                 </div>
                 <div className="form-row">
-                  <div className="form-group"><label>Manufacturer</label><input type="text" className="form-input" value={formData.manufacturer} onChange={(e) => setFormData(prev => ({ ...prev, manufacturer: e.target.value }))} /></div>
-                  <div className="form-group"><label>Model Number</label><input type="text" className="form-input" value={formData.model_number} onChange={(e) => setFormData(prev => ({ ...prev, model_number: e.target.value }))} /></div>
-                  <div className="form-group"><label>Serial Number</label><input type="text" className="form-input" value={formData.serial_number} onChange={(e) => setFormData(prev => ({ ...prev, serial_number: e.target.value }))} /></div>
+                  <div className="form-group">
+                    <label className="form-label">Manufacturer</label>
+                    <input type="text" className="form-input" value={formData.manufacturer} onChange={(e) => setFormData(prev => ({ ...prev, manufacturer: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Model Number</label>
+                    <input type="text" className="form-input" value={formData.model_number} onChange={(e) => setFormData(prev => ({ ...prev, model_number: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Serial Number</label>
+                    <input type="text" className="form-input" value={formData.serial_number} onChange={(e) => setFormData(prev => ({ ...prev, serial_number: e.target.value }))} />
+                  </div>
                 </div>
                 <div className="form-row">
-                  <div className="form-group"><label>Purchase Date</label><input type="date" className="form-input" value={formData.purchase_date} onChange={(e) => setFormData(prev => ({ ...prev, purchase_date: e.target.value }))} /></div>
-                  <div className="form-group"><label>Purchase Cost (KES)</label><input type="number" className="form-input" value={formData.purchase_cost} onChange={(e) => setFormData(prev => ({ ...prev, purchase_cost: e.target.value }))} /></div>
-                  <div className="form-group"><label>Supplier</label><input type="text" className="form-input" value={formData.supplier} onChange={(e) => setFormData(prev => ({ ...prev, supplier: e.target.value }))} /></div>
+                  <div className="form-group">
+                    <label className="form-label">Purchase Date</label>
+                    <input type="date" className="form-input" value={formData.purchase_date} onChange={(e) => setFormData(prev => ({ ...prev, purchase_date: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Purchase Cost (KES)</label>
+                    <input type="number" className="form-input" value={formData.purchase_cost} onChange={(e) => setFormData(prev => ({ ...prev, purchase_cost: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Supplier</label>
+                    <input type="text" className="form-input" value={formData.supplier} onChange={(e) => setFormData(prev => ({ ...prev, supplier: e.target.value }))} />
+                  </div>
                 </div>
                 <div className="form-row">
-                  <div className="form-group"><label>Warranty Expiry</label><input type="date" className="form-input" value={formData.warranty_expiry} onChange={(e) => setFormData(prev => ({ ...prev, warranty_expiry: e.target.value }))} /></div>
-                  <div className="form-group"><label>Status</label>
+                  <div className="form-group">
+                    <label className="form-label">Warranty Expiry</label>
+                    <input type="date" className="form-input" value={formData.warranty_expiry} onChange={(e) => setFormData(prev => ({ ...prev, warranty_expiry: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Status</label>
                     <select className="form-select" value={formData.status} onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}>
-                      <option value="OPERATIONAL">Operational</option><option value="UNDER_MAINTENANCE">Under Maintenance</option>
-                      <option value="OUT_OF_SERVICE">Out of Service</option><option value="RETIRED">Retired</option>
+                      <option value="OPERATIONAL">Operational</option>
+                      <option value="UNDER_MAINTENANCE">Under Maintenance</option>
+                      <option value="OUT_OF_SERVICE">Out of Service</option>
+                      <option value="RETIRED">Retired</option>
                     </select>
                   </div>
-                  <div className="form-group"><label>Condition</label>
+                  <div className="form-group">
+                    <label className="form-label">Condition</label>
                     <select className="form-select" value={formData.condition} onChange={(e) => setFormData(prev => ({ ...prev, condition: e.target.value }))}>
-                      <option value="EXCELLENT">Excellent</option><option value="GOOD">Good</option><option value="FAIR">Fair</option><option value="POOR">Poor</option>
+                      <option value="EXCELLENT">Excellent</option>
+                      <option value="GOOD">Good</option>
+                      <option value="FAIR">Fair</option>
+                      <option value="POOR">Poor</option>
                     </select>
                   </div>
                 </div>
@@ -198,23 +265,66 @@ export default function AssetRegister() {
             </div>
             <div className="modal-body">
               <div className="info-grid">
-                <div className="info-item"><div className="info-label">Asset ID</div><div className="info-value">{selectedAsset.asset_id}</div></div>
-                <div className="info-item"><div className="info-label">Category</div><div className="info-value">{selectedAsset.category_display}</div></div>
-                <div className="info-item"><div className="info-label">Location</div><div className="info-value">{selectedAsset.location}</div></div>
-                <div className="info-item"><div className="info-label">Status</div><div className="info-value">{selectedAsset.status_display}</div></div>
-                <div className="info-item"><div className="info-label">Condition</div><div className="info-value">{selectedAsset.condition_display}</div></div>
-                <div className="info-item"><div className="info-label">Purchase Date</div><div className="info-value">{selectedAsset.purchase_date ? new Date(selectedAsset.purchase_date).toLocaleDateString() : 'N/A'}</div></div>
-                <div className="info-item"><div className="info-label">Purchase Cost</div><div className="info-value">KES {selectedAsset.purchase_cost?.toLocaleString()}</div></div>
-                <div className="info-item"><div className="info-label">Warranty Expiry</div><div className="info-value">{selectedAsset.warranty_expiry ? new Date(selectedAsset.warranty_expiry).toLocaleDateString() : 'N/A'}</div></div>
+                <div className="info-item">
+                  <div className="info-label">Asset ID</div>
+                  <div className="info-value">{selectedAsset.asset_id}</div>
+                </div>
+                <div className="info-item">
+                  <div className="info-label">Category</div>
+                  <div className="info-value">{selectedAsset.category_display}</div>
+                </div>
+                <div className="info-item">
+                  <div className="info-label">Location</div>
+                  <div className="info-value">{selectedAsset.location}</div>
+                </div>
+                <div className="info-item">
+                  <div className="info-label">Status</div>
+                  <div className="info-value">{selectedAsset.status_display}</div>
+                </div>
+                <div className="info-item">
+                  <div className="info-label">Condition</div>
+                  <div className="info-value">{selectedAsset.condition_display}</div>
+                </div>
+                <div className="info-item">
+                  <div className="info-label">Manufacturer</div>
+                  <div className="info-value">{selectedAsset.manufacturer || 'N/A'}</div>
+                </div>
+                <div className="info-item">
+                  <div className="info-label">Model Number</div>
+                  <div className="info-value">{selectedAsset.model_number || 'N/A'}</div>
+                </div>
+                <div className="info-item">
+                  <div className="info-label">Serial Number</div>
+                  <div className="info-value">{selectedAsset.serial_number || 'N/A'}</div>
+                </div>
+                <div className="info-item">
+                  <div className="info-label">Purchase Date</div>
+                  <div className="info-value">{selectedAsset.purchase_date ? new Date(selectedAsset.purchase_date).toLocaleDateString() : 'N/A'}</div>
+                </div>
+                <div className="info-item">
+                  <div className="info-label">Purchase Cost</div>
+                  <div className="info-value">KES {selectedAsset.purchase_cost?.toLocaleString() || 'N/A'}</div>
+                </div>
+                <div className="info-item">
+                  <div className="info-label">Supplier</div>
+                  <div className="info-value">{selectedAsset.supplier || 'N/A'}</div>
+                </div>
+                <div className="info-item">
+                  <div className="info-label">Warranty Expiry</div>
+                  <div className="info-value">{selectedAsset.warranty_expiry ? new Date(selectedAsset.warranty_expiry).toLocaleDateString() : 'N/A'}</div>
+                </div>
                 {selectedAsset.next_maintenance_date && (
-                  <div className="info-item"><div className="info-label">Next Maintenance</div><div className="info-value">{new Date(selectedAsset.next_maintenance_date).toLocaleDateString()}</div></div>
+                  <div className="info-item">
+                    <div className="info-label">Next Maintenance</div>
+                    <div className="info-value">{new Date(selectedAsset.next_maintenance_date).toLocaleDateString()}</div>
+                  </div>
                 )}
               </div>
               {selectedAsset.description && (
                 <>
                   <div className="divider"></div>
                   <div className="info-label">Description</div>
-                  <div className="info-value">{selectedAsset.description}</div>
+                  <div className="info-value" style={{ marginTop: 4 }}>{selectedAsset.description}</div>
                 </>
               )}
             </div>
