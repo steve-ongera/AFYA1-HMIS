@@ -8,7 +8,7 @@ export default function PrescriptionQueue() {
   const location = useLocation()
   const queryParams = new URLSearchParams(location.search)
   const selectedRxId = queryParams.get('rx')
-  
+
   const [prescriptions, setPrescriptions] = useState([])
   const [selectedPrescription, setSelectedPrescription] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -27,9 +27,24 @@ export default function PrescriptionQueue() {
   const loadPrescriptions = async () => {
     try {
       const data = await prescriptionsAPI.list({ is_dispensed: false })
-      setPrescriptions(data)
+
+      // Handle DRF pagination shape: { count, next, previous, results: [...] }
+      // as well as plain array responses.
+      let list = []
+      if (Array.isArray(data)) {
+        list = data
+      } else if (data && Array.isArray(data.results)) {
+        list = data.results
+      } else if (data && Array.isArray(data.data)) {
+        list = data.data
+      } else {
+        console.warn('Unexpected prescriptions response shape:', data)
+      }
+
+      setPrescriptions(list)
     } catch (err) {
       console.error('Failed to load prescriptions', err)
+      setPrescriptions([])
     } finally {
       setLoading(false)
     }
