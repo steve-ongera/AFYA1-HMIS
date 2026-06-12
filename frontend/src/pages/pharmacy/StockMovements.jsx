@@ -3,6 +3,15 @@
 import React, { useState, useEffect } from 'react'
 import { stockAPI, medicinesAPI } from '../../services/api'
 
+// Normalize API responses that may be a plain array or a paginated DRF response
+const toArray = (data) => {
+  if (Array.isArray(data)) return data
+  if (data && Array.isArray(data.results)) return data.results
+  if (data && Array.isArray(data.data)) return data.data
+  console.warn('Unexpected list response shape:', data)
+  return []
+}
+
 export default function StockMovements() {
   const [movements, setMovements] = useState([])
   const [medicines, setMedicines] = useState([])
@@ -40,10 +49,12 @@ export default function StockMovements() {
         medicinesAPI.list(),
       ])
 
-      setMovements(movementsData || [])
-      setMedicines(medicinesData || [])
+      setMovements(toArray(movementsData))
+      setMedicines(toArray(medicinesData))
     } catch (err) {
       console.error('Failed to load stock movements:', err)
+      setMovements([])
+      setMedicines([])
     } finally {
       setLoading(false)
     }
