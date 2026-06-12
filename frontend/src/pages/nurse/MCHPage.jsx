@@ -33,7 +33,7 @@ export default function MCHPage() {
   const loadMCHVisits = async () => {
     try {
       const data = await mchAPI.list()
-      setMchVisits(data)
+      setMchVisits(Array.isArray(data) ? data : (data.results ?? []))
     } catch (err) {
       console.error('Failed to load MCH visits', err)
     } finally {
@@ -45,10 +45,26 @@ export default function MCHPage() {
     if (patientSearch.length < 2) return
     try {
       const data = await patientsAPI.list({ search: patientSearch })
-      setSearchResults(data)
+      setSearchResults(Array.isArray(data) ? data : (data.results ?? []))
     } catch (err) {
       console.error('Search failed', err)
     }
+  }
+
+  const resetForm = () => {
+    setFormData({
+      visit_type: 'IMMUNIZATION', child_age_months: '', weight_kg: '', height_cm: '', temperature: '',
+      immunization_due: false, vaccines_to_administer: '', has_danger_signs: false, danger_signs: '',
+      needs_doctor_consultation: false, consultation_reason: '', mothers_name: '', mothers_phone: '', assessment_notes: ''
+    })
+    setSelectedPatient(null)
+    setPatientSearch('')
+    setSearchResults([])
+  }
+
+  const handleClose = () => {
+    setShowModal(false)
+    resetForm()
   }
 
   const handleSubmit = async (e) => {
@@ -57,7 +73,7 @@ export default function MCHPage() {
       alert('Please select a patient')
       return
     }
-    
+
     try {
       const visit = await visitsAPI.create({
         patient: selectedPatient.id,
@@ -65,19 +81,13 @@ export default function MCHPage() {
         chief_complaint: `MCH visit - ${formData.visit_type}`,
         notes: formData.assessment_notes
       })
-      
+
       await mchAPI.create({
         ...formData,
         visit: visit.id
       })
-      
-      setShowModal(false)
-      setSelectedPatient(null)
-      setFormData({
-        visit_type: 'IMMUNIZATION', child_age_months: '', weight_kg: '', height_cm: '', temperature: '',
-        immunization_due: false, vaccines_to_administer: '', has_danger_signs: false, danger_signs: '',
-        needs_doctor_consultation: false, consultation_reason: '', mothers_name: '', mothers_phone: '', assessment_notes: ''
-      })
+
+      handleClose()
       loadMCHVisits()
     } catch (err) {
       console.error('Failed to create MCH visit', err)
@@ -122,7 +132,15 @@ export default function MCHPage() {
             <div className="table-wrapper">
               <table className="table">
                 <thead>
-                  <tr><th>Patient</th><th>Visit Type</th><th>Age (months)</th><th>Weight</th><th>Immunization</th><th>Doctor Needed</th><th>Actions</th></tr>
+                  <tr>
+                    <th>Patient</th>
+                    <th>Visit Type</th>
+                    <th>Age (months)</th>
+                    <th>Weight</th>
+                    <th>Immunization</th>
+                    <th>Doctor Needed</th>
+                    <th>Actions</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {mchVisits.map((visit) => (
@@ -149,11 +167,11 @@ export default function MCHPage() {
 
       {/* New MCH Visit Modal */}
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+        <div className="modal-overlay" onClick={handleClose}>
           <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="modal-title">New MCH Visit</h3>
-              <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
+              <button className="modal-close" onClick={handleClose}>✕</button>
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
@@ -161,15 +179,34 @@ export default function MCHPage() {
                   <>
                     <div className="search-wrapper">
                       <i className="bi bi-search search-icon"></i>
-                      <input type="text" className="form-input" placeholder="Search child patient..." value={patientSearch} onChange={(e) => setPatientSearch(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), searchPatients())} />
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="Search child patient..."
+                        value={patientSearch}
+                        onChange={(e) => setPatientSearch(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), searchPatients())}
+                      />
                     </div>
+                    <button type="button" className="btn btn-secondary" style={{ marginTop: 8 }} onClick={searchPatients}>
+                      <i className="bi bi-search"></i> Search
+                    </button>
                     {searchResults.length > 0 && (
                       <div className="table-wrapper" style={{ marginTop: 16 }}>
                         <table className="table">
                           <thead><tr><th>Name</th><th>Phone</th><th>Age</th><th></th></tr></thead>
                           <tbody>
                             {searchResults.map(p => (
-                              <tr key={p.id}><td>{p.full_name}</td><td>{p.phone_number}</td><td>{p.age}</td><td><button type="button" className="btn btn-sm btn-primary" onClick={() => setSelectedPatient(p)}>Select</button></td></tr>
+                              <tr key={p.id}>
+                                <td>{p.full_name}</td>
+                                <td>{p.phone_number}</td>
+                                <td>{p.age}</td>
+                                <td>
+                                  <button type="button" className="btn btn-sm btn-primary" onClick={() => setSelectedPatient(p)}>
+                                    Select
+                                  </button>
+                                </td>
+                              </tr>
                             ))}
                           </tbody>
                         </table>
@@ -185,19 +222,35 @@ export default function MCHPage() {
                     </div>
 
                     <div className="form-row">
-                      <div className="form-group"><label className="form-label required">Visit Type</label>
+                      <div className="form-group">
+                        <label className="form-label required">Visit Type</label>
                         <select className="form-select" required value={formData.visit_type} onChange={(e) => setFormData(prev => ({ ...prev, visit_type: e.target.value }))}>
-                          <option value="IMMUNIZATION">Immunization</option><option value="GROWTH_MONITORING">Growth Monitoring</option>
-                          <option value="SICK_CHILD">Sick Child</option><option value="NUTRITION">Nutrition</option><option value="DEVELOPMENTAL">Developmental Assessment</option>
+                          <option value="IMMUNIZATION">Immunization</option>
+                          <option value="GROWTH_MONITORING">Growth Monitoring</option>
+                          <option value="SICK_CHILD">Sick Child</option>
+                          <option value="NUTRITION">Nutrition</option>
+                          <option value="DEVELOPMENTAL">Developmental Assessment</option>
                         </select>
                       </div>
-                      <div className="form-group"><label className="form-label required">Child Age (months)</label><input type="number" className="form-input" required value={formData.child_age_months} onChange={(e) => setFormData(prev => ({ ...prev, child_age_months: e.target.value }))} /></div>
+                      <div className="form-group">
+                        <label className="form-label required">Child Age (months)</label>
+                        <input type="number" className="form-input" required value={formData.child_age_months} onChange={(e) => setFormData(prev => ({ ...prev, child_age_months: e.target.value }))} />
+                      </div>
                     </div>
 
                     <div className="form-row">
-                      <div className="form-group"><label>Weight (kg)</label><input type="number" step="0.1" className="form-input" value={formData.weight_kg} onChange={(e) => setFormData(prev => ({ ...prev, weight_kg: e.target.value }))} /></div>
-                      <div className="form-group"><label>Height (cm)</label><input type="number" step="0.1" className="form-input" value={formData.height_cm} onChange={(e) => setFormData(prev => ({ ...prev, height_cm: e.target.value }))} /></div>
-                      <div className="form-group"><label>Temperature (°C)</label><input type="number" step="0.1" className="form-input" value={formData.temperature} onChange={(e) => setFormData(prev => ({ ...prev, temperature: e.target.value }))} /></div>
+                      <div className="form-group">
+                        <label className="form-label">Weight (kg)</label>
+                        <input type="number" step="0.1" className="form-input" value={formData.weight_kg} onChange={(e) => setFormData(prev => ({ ...prev, weight_kg: e.target.value }))} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Height (cm)</label>
+                        <input type="number" step="0.1" className="form-input" value={formData.height_cm} onChange={(e) => setFormData(prev => ({ ...prev, height_cm: e.target.value }))} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Temperature (°C)</label>
+                        <input type="number" step="0.1" className="form-input" value={formData.temperature} onChange={(e) => setFormData(prev => ({ ...prev, temperature: e.target.value }))} />
+                      </div>
                     </div>
 
                     <div className="form-group">
@@ -243,8 +296,14 @@ export default function MCHPage() {
                     )}
 
                     <div className="form-row">
-                      <div className="form-group"><label className="form-label required">Mother's Name</label><input type="text" className="form-input" required value={formData.mothers_name} onChange={(e) => setFormData(prev => ({ ...prev, mothers_name: e.target.value }))} /></div>
-                      <div className="form-group"><label className="form-label required">Mother's Phone</label><input type="tel" className="form-input" required value={formData.mothers_phone} onChange={(e) => setFormData(prev => ({ ...prev, mothers_phone: e.target.value }))} /></div>
+                      <div className="form-group">
+                        <label className="form-label required">Mother's Name</label>
+                        <input type="text" className="form-input" required value={formData.mothers_name} onChange={(e) => setFormData(prev => ({ ...prev, mothers_name: e.target.value }))} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label required">Mother's Phone</label>
+                        <input type="tel" className="form-input" required value={formData.mothers_phone} onChange={(e) => setFormData(prev => ({ ...prev, mothers_phone: e.target.value }))} />
+                      </div>
                     </div>
 
                     <div className="form-group">
@@ -255,7 +314,7 @@ export default function MCHPage() {
                 )}
               </div>
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
+                <button type="button" className="btn btn-secondary" onClick={handleClose}>Cancel</button>
                 <button type="submit" className="btn btn-primary" disabled={!selectedPatient}>Create MCH Visit</button>
               </div>
             </form>

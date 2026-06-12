@@ -34,7 +34,7 @@ export default function MaternityPage() {
   const loadMaternityVisits = async () => {
     try {
       const data = await maternityAPI.list()
-      setMaternityVisits(data)
+      setMaternityVisits(Array.isArray(data) ? data : (data.results ?? []))
     } catch (err) {
       console.error('Failed to load maternity visits', err)
     } finally {
@@ -46,10 +46,27 @@ export default function MaternityPage() {
     if (patientSearch.length < 2) return
     try {
       const data = await patientsAPI.list({ search: patientSearch })
-      setSearchResults(data)
+      setSearchResults(Array.isArray(data) ? data : (data.results ?? []))
     } catch (err) {
       console.error('Search failed', err)
     }
+  }
+
+  const resetForm = () => {
+    setFormData({
+      visit_purpose: 'LABOR', gravida: '', para: '', abortion: '0', gestational_age_weeks: '',
+      expected_delivery_date: '', is_in_labor: false, contractions_frequency: '', membranes_ruptured: false,
+      cervical_dilation: '', fetal_heart_rate: '', is_high_risk: false, risk_factors: '',
+      needs_csection: false, initial_assessment: ''
+    })
+    setSelectedPatient(null)
+    setPatientSearch('')
+    setSearchResults([])
+  }
+
+  const handleClose = () => {
+    setShowModal(false)
+    resetForm()
   }
 
   const handleSubmit = async (e) => {
@@ -58,7 +75,7 @@ export default function MaternityPage() {
       alert('Please select a patient')
       return
     }
-    
+
     try {
       // First create a visit
       const visit = await visitsAPI.create({
@@ -67,21 +84,14 @@ export default function MaternityPage() {
         chief_complaint: `Maternity visit - ${formData.visit_purpose}`,
         notes: formData.initial_assessment
       })
-      
+
       // Then create maternity record
       await maternityAPI.create({
         ...formData,
         visit: visit.id
       })
-      
-      setShowModal(false)
-      setSelectedPatient(null)
-      setFormData({
-        visit_purpose: 'LABOR', gravida: '', para: '', abortion: '0', gestational_age_weeks: '',
-        expected_delivery_date: '', is_in_labor: false, contractions_frequency: '', membranes_ruptured: false,
-        cervical_dilation: '', fetal_heart_rate: '', is_high_risk: false, risk_factors: '',
-        needs_csection: false, initial_assessment: ''
-      })
+
+      handleClose()
       loadMaternityVisits()
     } catch (err) {
       console.error('Failed to create maternity visit', err)
@@ -126,7 +136,15 @@ export default function MaternityPage() {
             <div className="table-wrapper">
               <table className="table">
                 <thead>
-                  <tr><th>Patient</th><th>Visit Type</th><th>Gravida/Para</th><th>Gestational Age</th><th>In Labor</th><th>High Risk</th><th>Actions</th></tr>
+                  <tr>
+                    <th>Patient</th>
+                    <th>Visit Type</th>
+                    <th>Gravida/Para</th>
+                    <th>Gestational Age</th>
+                    <th>In Labor</th>
+                    <th>High Risk</th>
+                    <th>Actions</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {maternityVisits.map((visit) => (
@@ -153,11 +171,11 @@ export default function MaternityPage() {
 
       {/* New Maternity Visit Modal */}
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+        <div className="modal-overlay" onClick={handleClose}>
           <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="modal-title">New Maternity Visit</h3>
-              <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
+              <button className="modal-close" onClick={handleClose}>✕</button>
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
@@ -165,17 +183,35 @@ export default function MaternityPage() {
                   <>
                     <div className="search-wrapper">
                       <i className="bi bi-search search-icon"></i>
-                      <input type="text" className="form-input" placeholder="Search patient by name, phone, or ID..." value={patientSearch} onChange={(e) => setPatientSearch(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), searchPatients())} />
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="Search patient by name, phone, or ID..."
+                        value={patientSearch}
+                        onChange={(e) => setPatientSearch(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), searchPatients())}
+                      />
                     </div>
+                    <button type="button" className="btn btn-secondary" style={{ marginTop: 8 }} onClick={searchPatients}>
+                      <i className="bi bi-search"></i> Search
+                    </button>
                     {searchResults.length > 0 && (
                       <div className="table-wrapper" style={{ marginTop: 16 }}>
                         <table className="table">
-                          <thead><tr><th>Name</th><th>Phone</th><th>Age</th><th></th></tr></thead>
+                          <thead>
+                            <tr><th>Name</th><th>Phone</th><th>Age</th><th></th></tr>
+                          </thead>
                           <tbody>
                             {searchResults.map(p => (
                               <tr key={p.id}>
-                                <td>{p.full_name}</td><td>{p.phone_number}</td><td>{p.age}</td>
-                                <td><button type="button" className="btn btn-sm btn-primary" onClick={() => setSelectedPatient(p)}>Select</button></td>
+                                <td>{p.full_name}</td>
+                                <td>{p.phone_number}</td>
+                                <td>{p.age}</td>
+                                <td>
+                                  <button type="button" className="btn btn-sm btn-primary" onClick={() => setSelectedPatient(p)}>
+                                    Select
+                                  </button>
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -188,27 +224,51 @@ export default function MaternityPage() {
                     <div className="alert alert-info" style={{ marginBottom: 16 }}>
                       <i className="bi bi-person-circle"></i>
                       <span>Patient: {selectedPatient.full_name} | Age: {selectedPatient.age} | Phone: {selectedPatient.phone_number}</span>
-                      <button type="button" className="btn btn-sm btn-ghost" onClick={() => setSelectedPatient(null)} style={{ marginLeft: 'auto' }}>Change</button>
+                      <button type="button" className="btn btn-sm btn-ghost" onClick={() => setSelectedPatient(null)} style={{ marginLeft: 'auto' }}>
+                        Change
+                      </button>
                     </div>
 
                     <div className="form-row">
                       <div className="form-group">
                         <label className="form-label required">Visit Purpose</label>
-                        <select className="form-select" required value={formData.visit_purpose} onChange={(e) => setFormData(prev => ({ ...prev, visit_purpose: e.target.value }))}>
-                          <option value="LABOR">Labor & Delivery</option><option value="ANTENATAL">Antenatal</option><option value="POSTNATAL">Postnatal</option>
+                        <select
+                          className="form-select"
+                          required
+                          value={formData.visit_purpose}
+                          onChange={(e) => setFormData(prev => ({ ...prev, visit_purpose: e.target.value }))}
+                        >
+                          <option value="LABOR">Labor & Delivery</option>
+                          <option value="ANTENATAL">Antenatal</option>
+                          <option value="POSTNATAL">Postnatal</option>
                         </select>
                       </div>
                     </div>
 
                     <div className="form-row">
-                      <div className="form-group"><label className="form-label">Gravida</label><input type="number" className="form-input" value={formData.gravida} onChange={(e) => setFormData(prev => ({ ...prev, gravida: e.target.value }))} /></div>
-                      <div className="form-group"><label className="form-label">Para</label><input type="number" className="form-input" value={formData.para} onChange={(e) => setFormData(prev => ({ ...prev, para: e.target.value }))} /></div>
-                      <div className="form-group"><label className="form-label">Abortions</label><input type="number" className="form-input" value={formData.abortion} onChange={(e) => setFormData(prev => ({ ...prev, abortion: e.target.value }))} /></div>
+                      <div className="form-group">
+                        <label className="form-label">Gravida</label>
+                        <input type="number" className="form-input" value={formData.gravida} onChange={(e) => setFormData(prev => ({ ...prev, gravida: e.target.value }))} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Para</label>
+                        <input type="number" className="form-input" value={formData.para} onChange={(e) => setFormData(prev => ({ ...prev, para: e.target.value }))} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Abortions</label>
+                        <input type="number" className="form-input" value={formData.abortion} onChange={(e) => setFormData(prev => ({ ...prev, abortion: e.target.value }))} />
+                      </div>
                     </div>
 
                     <div className="form-row">
-                      <div className="form-group"><label>Gestational Age (weeks)</label><input type="number" className="form-input" value={formData.gestational_age_weeks} onChange={(e) => setFormData(prev => ({ ...prev, gestational_age_weeks: e.target.value }))} /></div>
-                      <div className="form-group"><label>Expected Delivery Date</label><input type="date" className="form-input" value={formData.expected_delivery_date} onChange={(e) => setFormData(prev => ({ ...prev, expected_delivery_date: e.target.value }))} /></div>
+                      <div className="form-group">
+                        <label className="form-label">Gestational Age (weeks)</label>
+                        <input type="number" className="form-input" value={formData.gestational_age_weeks} onChange={(e) => setFormData(prev => ({ ...prev, gestational_age_weeks: e.target.value }))} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Expected Delivery Date</label>
+                        <input type="date" className="form-input" value={formData.expected_delivery_date} onChange={(e) => setFormData(prev => ({ ...prev, expected_delivery_date: e.target.value }))} />
+                      </div>
                     </div>
 
                     <div className="form-group">
@@ -220,9 +280,18 @@ export default function MaternityPage() {
 
                     {formData.is_in_labor && (
                       <div className="form-row">
-                        <div className="form-group"><label>Contractions Frequency</label><input type="text" className="form-input" value={formData.contractions_frequency} onChange={(e) => setFormData(prev => ({ ...prev, contractions_frequency: e.target.value }))} placeholder="e.g., Every 5 minutes" /></div>
-                        <div className="form-group"><label>Cervical Dilation (cm)</label><input type="number" step="0.5" className="form-input" value={formData.cervical_dilation} onChange={(e) => setFormData(prev => ({ ...prev, cervical_dilation: e.target.value }))} /></div>
-                        <div className="form-group"><label>Fetal Heart Rate</label><input type="number" className="form-input" value={formData.fetal_heart_rate} onChange={(e) => setFormData(prev => ({ ...prev, fetal_heart_rate: e.target.value }))} /></div>
+                        <div className="form-group">
+                          <label className="form-label">Contractions Frequency</label>
+                          <input type="text" className="form-input" value={formData.contractions_frequency} onChange={(e) => setFormData(prev => ({ ...prev, contractions_frequency: e.target.value }))} placeholder="e.g., Every 5 minutes" />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Cervical Dilation (cm)</label>
+                          <input type="number" step="0.5" className="form-input" value={formData.cervical_dilation} onChange={(e) => setFormData(prev => ({ ...prev, cervical_dilation: e.target.value }))} />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Fetal Heart Rate</label>
+                          <input type="number" className="form-input" value={formData.fetal_heart_rate} onChange={(e) => setFormData(prev => ({ ...prev, fetal_heart_rate: e.target.value }))} />
+                        </div>
                       </div>
                     )}
 
@@ -262,7 +331,7 @@ export default function MaternityPage() {
                 )}
               </div>
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
+                <button type="button" className="btn btn-secondary" onClick={handleClose}>Cancel</button>
                 <button type="submit" className="btn btn-primary" disabled={!selectedPatient}>Create Maternity Visit</button>
               </div>
             </form>
