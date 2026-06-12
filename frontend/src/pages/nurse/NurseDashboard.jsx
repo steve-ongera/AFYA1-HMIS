@@ -16,6 +16,9 @@ export default function NurseDashboard() {
     loadDashboardData()
   }, [])
 
+  const normalizeList = (data) =>
+    Array.isArray(data) ? data : (data?.results ?? [])
+
   const loadDashboardData = async () => {
     try {
       const [statsData, queueData, admissionsData] = await Promise.all([
@@ -24,8 +27,8 @@ export default function NurseDashboard() {
         admissionsAPI.active()
       ])
       setStats(statsData)
-      setTriageQueue(queueData)
-      setActiveAdmissions(admissionsData)
+      setTriageQueue(normalizeList(queueData))
+      setActiveAdmissions(normalizeList(admissionsData))
     } catch (err) {
       console.error('Failed to load dashboard', err)
     } finally {
@@ -110,7 +113,15 @@ export default function NurseDashboard() {
           ) : (
             <div className="table-wrapper">
               <table className="table">
-                <thead><tr><th>Patient</th><th>Admission #</th><th>Bed</th><th>Doctor</th><th>Actions</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>Patient</th>
+                    <th>Admission #</th>
+                    <th>Bed</th>
+                    <th>Doctor</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {activeAdmissions.map((admission) => (
                     <tr key={admission.id}>
@@ -119,7 +130,10 @@ export default function NurseDashboard() {
                       <td>{admission.bed_info?.bed_number || 'N/A'}</td>
                       <td>{admission.attending_doctor_name || 'N/A'}</td>
                       <td>
-                        <button className="btn btn-sm btn-ghost" onClick={() => navigate(`/nurse/vitals?admission=${admission.id}`)}>
+                        <button
+                          className="btn btn-sm btn-ghost"
+                          onClick={() => navigate(`/nurse/vitals?admission=${admission.id}`)}
+                        >
                           <i className="bi bi-heart-pulse"></i> Vitals
                         </button>
                       </td>

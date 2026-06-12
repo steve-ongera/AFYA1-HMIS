@@ -822,3 +822,12 @@ INFO 2026-06-12 17:01:55,866 basehttp 3872 9416 "GET /api/admissions/?active=tru
 INFO 2026-06-12 17:01:55,906 basehttp 3872 4036 "GET /api/admissions/?active=true HTTP/1.1" 200 52
 INFO 2026-06-12 17:01:57,941 basehttp 3872 4036 "GET /api/lab-orders/?status=REPORTED HTTP/1.1" 200 52
 INFO 2026-06-12 17:01:57,979 basehttp 3872 9416 "GET /api/lab-orders/?status=REPORTED HTTP/1.1" 200 52
+INFO 2026-06-12 17:03:13,551 basehttp 3872 4036 "POST /api/auth/refresh/ HTTP/1.1" 200 269
+INFO 2026-06-12 17:03:13,552 basehttp 3872 9416 "POST /api/auth/refresh/ HTTP/1.1" 200 269
+INFO 2026-06-12 17:03:13,577 basehttp 3872 9416 "GET /api/auth/me/ HTTP/1.1" 200 246
+INFO 2026-06-12 17:03:13,590 basehttp 3872 4036 "GET /api/auth/me/ HTTP/1.1" 200 246
+INFO 2026-06-12 17:03:13,762 basehttp 3872 4036 "GET /api/notifications/unread_count/ HTTP/1.1" 200 18
+INFO 2026-06-12 17:03:13,762 basehttp 3872 9416 "GET /api/lab-orders/?status=REPORTED HTTP/1.1" 200 52
+INFO 2026-06-12 17:03:13,773 basehttp 3872 15832 "GET /api/notifications/unread_count/ HTTP/1.1" 200 18
+INFO 2026-06-12 17:03:13,780 basehttp 3872 4036 "GET /api/lab-orders/?status=REPORTED HTTP/1.1" 200 52
+INFO 2026-06-12 17:03:13,892 basehttp 3872 4036 "GET /api/notifications/unread_count/ HTTP/1.1" 200 18
