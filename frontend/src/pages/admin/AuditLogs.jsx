@@ -18,9 +18,9 @@ export default function AuditLogs() {
       const params = {}
       if (actionFilter) params.action = actionFilter
       if (dateFilter) params.date = dateFilter
-      
+
       const data = await auditAPI.logs(params)
-      setLogs(data)
+      setLogs(Array.isArray(data) ? data : (data.results || []))
     } catch (err) {
       console.error('Failed to load audit logs', err)
     } finally {
@@ -73,9 +73,20 @@ export default function AuditLogs() {
         <div className="card-header">
           <div className="search-wrapper" style={{ flex: 1 }}>
             <i className="bi bi-search search-icon"></i>
-            <input type="text" className="form-input" placeholder="Search logs..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            <input
+              type="text"
+              className="form-input"
+              placeholder="Search logs..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
-          <select className="form-select" style={{ width: 120 }} value={actionFilter} onChange={(e) => setActionFilter(e.target.value)}>
+          <select
+            className="form-select"
+            style={{ width: 120 }}
+            value={actionFilter}
+            onChange={(e) => setActionFilter(e.target.value)}
+          >
             <option value="">All Actions</option>
             <option value="create">Create</option>
             <option value="update">Update</option>
@@ -83,7 +94,13 @@ export default function AuditLogs() {
             <option value="login">Login</option>
             <option value="logout">Logout</option>
           </select>
-          <input type="date" className="form-input" style={{ width: 150 }} value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} />
+          <input
+            type="date"
+            className="form-input"
+            style={{ width: 150 }}
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+          />
         </div>
         <div className="card-body">
           {filteredLogs.length === 0 ? (
@@ -95,14 +112,26 @@ export default function AuditLogs() {
             <div className="table-wrapper">
               <table className="table">
                 <thead>
-                  <tr><th>Timestamp</th><th>User</th><th>Action</th><th>Table</th><th>Record ID</th><th>Description</th><th>IP Address</th></tr>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Table</th>
+                    <th>Record ID</th>
+                    <th>Description</th>
+                    <th>IP Address</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {filteredLogs.map((log) => (
                     <tr key={log.id}>
                       <td>{new Date(log.timestamp).toLocaleString()}</td>
                       <td>{log.user_name || 'System'}</td>
-                      <td><span className={`badge ${getActionBadge(log.action)}`}>{log.action}</span></td>
+                      <td>
+                        <span className={`badge ${getActionBadge(log.action)}`}>
+                          {log.action}
+                        </span>
+                      </td>
                       <td>{log.table_affected}</td>
                       <td>{log.record_id || '-'}</td>
                       <td>{log.description}</td>
