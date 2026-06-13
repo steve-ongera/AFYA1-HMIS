@@ -4,6 +4,15 @@ import { useNavigate } from 'react-router-dom'
 import { dashboardAPI, cashierAPI, paymentsAPI } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 
+// Normalize API responses that may be a plain array or a paginated DRF response
+const toArray = (data) => {
+  if (Array.isArray(data)) return data
+  if (data && Array.isArray(data.results)) return data.results
+  if (data && Array.isArray(data.data)) return data.data
+  console.warn('Unexpected list response shape:', data)
+  return []
+}
+
 export default function CashierDashboard() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -25,9 +34,10 @@ export default function CashierDashboard() {
       ])
       setStats(statsData)
       setActiveSession(sessionData)
-      setRecentPayments(paymentsData)
+      setRecentPayments(toArray(paymentsData))
     } catch (err) {
       console.error('Failed to load dashboard', err)
+      setRecentPayments([])
     } finally {
       setLoading(false)
     }
@@ -132,7 +142,7 @@ export default function CashierDashboard() {
                       <td>{new Date(payment.created_at).toLocaleTimeString()}</td>
                       <td>{payment.transaction_id}</td>
                       <td>{payment.transaction_type_display}</td>
-                      <td>KES {payment.amount.toLocaleString()}</td>
+                      <td>KES {Number(payment.amount).toLocaleString()}</td>
                       <td>{payment.payment_method}</td>
                       <td><span className={`badge ${payment.status === 'SUCCESS' ? 'badge-success' : 'badge-danger'}`}>{payment.status}</span></td>
                     </tr>
