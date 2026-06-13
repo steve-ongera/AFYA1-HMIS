@@ -25,8 +25,8 @@ export default function AttendanceQR() {
         attendanceAPI.qrCodes(),
         wifiAPI.list()
       ])
-      setQrCodes(qrData)
-      setWifiNetworks(wifiData)
+      setQrCodes(Array.isArray(qrData) ? qrData : (qrData?.results ?? []))
+      setWifiNetworks(Array.isArray(wifiData) ? wifiData : (wifiData?.results ?? []))
     } catch (err) {
       console.error('Failed to load data', err)
     } finally {
@@ -116,7 +116,6 @@ export default function AttendanceQR() {
         </div>
       </div>
 
-      {/* Generate QR Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>

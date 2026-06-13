@@ -24,8 +24,8 @@ export default function HRDashboard() {
         leaveAPI.list({ status: 'PENDING' })
       ])
       setStats(statsData)
-      setPresentToday(attendanceData)
-      setPendingLeaves(leavesData)
+      setPresentToday(Array.isArray(attendanceData) ? attendanceData : (attendanceData?.results ?? []))
+      setPendingLeaves(Array.isArray(leavesData) ? leavesData : (leavesData?.results ?? []))
     } catch (err) {
       console.error('Failed to load dashboard', err)
     } finally {
