@@ -35,8 +35,8 @@ export default function PurchaseOrders() {
         purchaseOrdersAPI.list(),
         suppliersAPI.list()
       ])
-      setOrders(ordersData)
-      setSuppliers(suppliersData)
+      setOrders(Array.isArray(ordersData) ? ordersData : (ordersData?.results ?? []))
+      setSuppliers(Array.isArray(suppliersData) ? suppliersData : (suppliersData?.results ?? []))
     } catch (err) {
       console.error('Failed to load data', err)
     } finally {
@@ -222,7 +222,6 @@ export default function PurchaseOrders() {
         </div>
       </div>
 
-      {/* Create PO Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>

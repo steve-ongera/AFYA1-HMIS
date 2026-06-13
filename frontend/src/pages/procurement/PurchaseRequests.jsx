@@ -37,8 +37,8 @@ export default function PurchaseRequests() {
         purchaseRequestsAPI.list(),
         medicinesAPI.list()
       ])
-      setRequests(requestsData)
-      setMedicines(medicinesData)
+      setRequests(Array.isArray(requestsData) ? requestsData : (requestsData?.results ?? []))
+      setMedicines(Array.isArray(medicinesData) ? medicinesData : (medicinesData?.results ?? []))
     } catch (err) {
       console.error('Failed to load data', err)
     } finally {
@@ -322,7 +322,6 @@ export default function PurchaseRequests() {
         </div>
       </div>
 
-      {/* Create PR Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>

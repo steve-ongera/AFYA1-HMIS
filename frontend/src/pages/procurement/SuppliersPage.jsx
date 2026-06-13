@@ -21,7 +21,7 @@ export default function SuppliersPage() {
   const loadSuppliers = async () => {
     try {
       const data = await suppliersAPI.list()
-      setSuppliers(data)
+      setSuppliers(Array.isArray(data) ? data : (data?.results ?? []))
     } catch (err) {
       console.error('Failed to load suppliers', err)
     } finally {
@@ -149,7 +149,6 @@ export default function SuppliersPage() {
         </div>
       </div>
 
-      {/* Add/Edit Supplier Modal */}
       {(showModal || editingSupplier) && (
         <div className="modal-overlay" onClick={() => {
           setShowModal(false)

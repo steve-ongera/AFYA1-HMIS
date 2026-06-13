@@ -35,8 +35,8 @@ export default function GoodsReceived() {
         grnAPI.list(),
         purchaseOrdersAPI.list({ status__in: ['SENT', 'ACKNOWLEDGED', 'PARTIALLY_RECEIVED'] })
       ])
-      setGrns(grnsData)
-      setPurchaseOrders(posData)
+      setGrns(Array.isArray(grnsData) ? grnsData : (grnsData?.results ?? []))
+      setPurchaseOrders(Array.isArray(posData) ? posData : (posData?.results ?? []))
     } catch (err) {
       console.error('Failed to load data', err)
     } finally {
@@ -255,7 +255,6 @@ export default function GoodsReceived() {
         </div>
       </div>
 
-      {/* Receive Goods Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>

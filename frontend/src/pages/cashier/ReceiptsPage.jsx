@@ -15,13 +15,14 @@ export default function ReceiptsPage() {
   }, [dateFilter])
 
   const loadReceipts = async () => {
+    setLoading(true)
     try {
       let params = {}
       if (dateFilter === 'today') params.today = true
       else if (dateFilter === 'week') params.created_at__week = new Date().getWeek()
-      
+
       const data = await paymentsAPI.logs(params)
-      setReceipts(data)
+      setReceipts(Array.isArray(data) ? data : (data?.results ?? []))
     } catch (err) {
       console.error('Failed to load receipts', err)
     } finally {
@@ -121,7 +122,7 @@ export default function ReceiptsPage() {
                       <td>KES {receipt.amount.toLocaleString()}</td>
                       <td>{receipt.payment_method}</td>
                       <td><span className={`badge ${receipt.status === 'SUCCESS' ? 'badge-success' : 'badge-danger'}`}>{receipt.status}</span></td>
-                      <td>
+                      <td style={{ display: 'flex', gap: 6 }}>
                         <button className="btn btn-sm btn-primary" onClick={() => printReceipt(receipt)}>
                           <i className="bi bi-printer"></i> Print
                         </button>
@@ -138,7 +139,6 @@ export default function ReceiptsPage() {
         </div>
       </div>
 
-      {/* Receipt Modal */}
       {selectedReceipt && (
         <div className="modal-overlay" onClick={() => setSelectedReceipt(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -177,7 +177,7 @@ export default function ReceiptsPage() {
 }
 
 // Helper function for week calculation
-Date.prototype.getWeek = function() {
+Date.prototype.getWeek = function () {
   const date = new Date(this)
   date.setHours(0, 0, 0, 0)
   date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7)

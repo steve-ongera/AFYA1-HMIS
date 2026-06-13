@@ -25,10 +25,11 @@ export default function ProcurementDashboard() {
         purchaseOrdersAPI.list({ status__in: ['SENT', 'ACKNOWLEDGED'] }),
         grnAPI.list({ status: 'PENDING' })
       ])
+
       setStats(statsData)
-      setPendingPRs(prData)
-      setPendingPOs(poData)
-      setPendingGRNs(grnData)
+      setPendingPRs(Array.isArray(prData) ? prData : (prData?.results ?? []))
+      setPendingPOs(Array.isArray(poData) ? poData : (poData?.results ?? []))
+      setPendingGRNs(Array.isArray(grnData) ? grnData : (grnData?.results ?? []))
     } catch (err) {
       console.error('Failed to load dashboard', err)
     } finally {
