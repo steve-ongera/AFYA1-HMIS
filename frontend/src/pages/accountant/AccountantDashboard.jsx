@@ -24,8 +24,8 @@ export default function AccountantDashboard() {
         paymentsAPI.logs({ today: true })
       ])
       setStats(statsData)
-      setPendingInvoices(invoicesData)
-      setRecentPayments(paymentsData)
+      setPendingInvoices(Array.isArray(invoicesData) ? invoicesData : (invoicesData?.results ?? []))
+      setRecentPayments(Array.isArray(paymentsData) ? paymentsData : (paymentsData?.results ?? []))
     } catch (err) {
       console.error('Failed to load dashboard', err)
     } finally {

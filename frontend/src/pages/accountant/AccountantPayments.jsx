@@ -13,13 +13,14 @@ export default function AccountantPayments() {
   }, [dateRange])
 
   const loadPayments = async () => {
+    setLoading(true)
     try {
       const params = {}
       if (dateRange.from) params.created_at__date__gte = dateRange.from
       if (dateRange.to) params.created_at__date__lte = dateRange.to
-      
+
       const data = await paymentsAPI.logs(params)
-      setPayments(data)
+      setPayments(Array.isArray(data) ? data : (data?.results ?? []))
     } catch (err) {
       console.error('Failed to load payments', err)
     } finally {
@@ -151,7 +152,6 @@ export default function AccountantPayments() {
         </div>
       </div>
 
-      {/* Payment Details Modal */}
       {selectedPayment && (
         <div className="modal-overlay" onClick={() => setSelectedPayment(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
