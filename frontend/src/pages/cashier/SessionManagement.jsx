@@ -25,12 +25,16 @@ export default function SessionManagement() {
         cashierAPI.sessions(),
         paymentsAPI.logs({ processed_by: user.id })
       ])
+
+      const historyList = Array.isArray(history) ? history : (history?.results ?? [])
+      const paymentsList = Array.isArray(payments) ? payments : (payments?.results ?? [])
+
       setActiveSession(session)
-      setSessionHistory(history)
-      setTransactions(payments)
-      
+      setSessionHistory(historyList)
+      setTransactions(paymentsList)
+
       if (session) {
-        const expected = session.opening_balance + payments.reduce((sum, p) => sum + p.amount, 0)
+        const expected = session.opening_balance + paymentsList.reduce((sum, p) => sum + p.amount, 0)
         setActiveSession(prev => ({ ...prev, expected_cash: expected }))
       }
     } catch (err) {
@@ -170,7 +174,6 @@ export default function SessionManagement() {
         </div>
       </div>
 
-      {/* Close Session Modal */}
       {showCloseModal && (
         <div className="modal-overlay" onClick={() => setShowCloseModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -184,11 +187,22 @@ export default function SessionManagement() {
               </div>
               <div className="form-group">
                 <label className="form-label required">Actual Cash Count (KES)</label>
-                <input type="number" className="form-input" required value={closingData.actual_cash} onChange={(e) => setClosingData(prev => ({ ...prev, actual_cash: e.target.value }))} />
+                <input
+                  type="number"
+                  className="form-input"
+                  required
+                  value={closingData.actual_cash}
+                  onChange={(e) => setClosingData(prev => ({ ...prev, actual_cash: e.target.value }))}
+                />
               </div>
               <div className="form-group">
                 <label className="form-label">Reconciliation Notes</label>
-                <textarea className="form-textarea" rows="2" value={closingData.notes} onChange={(e) => setClosingData(prev => ({ ...prev, notes: e.target.value }))}></textarea>
+                <textarea
+                  className="form-textarea"
+                  rows="2"
+                  value={closingData.notes}
+                  onChange={(e) => setClosingData(prev => ({ ...prev, notes: e.target.value }))}
+                ></textarea>
               </div>
               {closingData.actual_cash && (
                 <div className={`alert ${parseFloat(closingData.actual_cash) !== activeSession?.expected_cash ? 'alert-warning' : 'alert-success'}`}>
