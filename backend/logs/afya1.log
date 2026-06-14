@@ -3737,3 +3737,4 @@ INFO 2026-06-14 16:07:11,126 basehttp 9248 2684 "GET /api/notifications/unread_c
 INFO 2026-06-14 16:08:11,152 basehttp 9248 2684 "GET /api/notifications/unread_count/ HTTP/1.1" 200 18
 INFO 2026-06-14 16:08:41,551 autoreload 9248 8580 D:\BACKUP\Complete Projects\afya1_hmis\backend\core\views.py changed, reloading.
 INFO 2026-06-14 16:08:44,084 autoreload 9752 17320 Watching for file changes with StatReloader
+INFO 2026-06-14 16:09:11,690 basehttp 9752 6856 "GET /api/notifications/unread_count/ HTTP/1.1" 200 18
