@@ -315,6 +315,21 @@ export const medicineRequestsAPI = {
   reject:   (id, data) => post(`/medicine-requests/${id}/reject/`, data),
 }
 
+// Add this export if not already present
+export const inpatientVitalsAPI = {
+  list: (params) => get('/inpatient-vitals/', params),
+  create: (data) => post('/inpatient-vitals/', data),
+  getByAdmission: (admissionId) => get('/inpatient-vitals/', { admission: admissionId }),
+}
+
+// Also add triageAPI if missing
+export const triageAPI = {
+  list: (params) => get('/triage-assessments/', params),
+  get: (id) => get(`/triage-assessments/${id}/`),
+  create: (data) => post('/triage-assessments/', data),
+  update: (id, data) => patch(`/triage-assessments/${id}/`, data),
+}
+
 
 // ══════════════════════════════════════════════════════════════════════════════
 // EMERGENCY
