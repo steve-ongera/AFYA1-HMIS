@@ -59,7 +59,7 @@ class UserSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name', 'full_name',
             'user_type', 'phone_number', 'specialization', 'license_number', 'is_active',
-        ]
+        ]  # phone_number already here - good
         read_only_fields = ['id', 'full_name']
 
     def get_full_name(self, obj):
@@ -97,7 +97,7 @@ class UserListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'full_name', 'user_type', 'is_active']
+        fields = ['id', 'full_name', 'username', 'email', 'phone_number', 'user_type', 'is_active']  # ADDED email and phone_number
 
     def get_full_name(self, obj):
         return obj.get_full_name() or obj.username
