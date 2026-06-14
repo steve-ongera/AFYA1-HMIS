@@ -149,9 +149,12 @@ const NAV = {
 }
 
 // ── Shared links visible to all roles ─────────────────────────────────────────
+
 const SHARED_LINKS = [
-  { label: 'Notifications', path: '/shared/notifications', icon: Bell },
-  { label: 'Messages',      path: '/shared/messages',       icon: MessageSquare },
+  { label: 'Patient Directory', path: '/shared/patients', icon: Users },        // NEW
+  { label: 'Visit History',     path: '/shared/visits', icon: Calendar },       // NEW
+  { label: 'Notifications',     path: '/shared/notifications', icon: Bell },
+  { label: 'Messages',          path: '/shared/messages', icon: MessageSquare },
 ]
 
 export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen }) {

@@ -8,6 +8,9 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import Navbar from './components/Navbar'
 import Sidebar from './components/Sidebar'
+// Add these to your imports in App.jsx
+import PatientList from './pages/shared/PatientList'
+import PatientVisitList from './pages/shared/PatientVisitList'
 
 // ── Lazy-load pages ────────────────────────────────────────────────────────────
 const Login = lazy(() => import('./pages/Login'))
@@ -450,16 +453,21 @@ export default function App() {
         {/* ════════════════════════════════════════
             SHARED — accessible to all roles
         ════════════════════════════════════════ */}
+        {/* ════════════════════════════════════════
+            SHARED — accessible to all roles
+        ════════════════════════════════════════ */}
         <Route
           path="/shared/*"
           element={
             <ProtectedRoute>
               <AppShell>
                 <Routes>
-                  <Route path="patient/:id"    element={<PatientProfile />} />
-                  <Route path="visit/:id"      element={<VisitDetail />} />
-                  <Route path="notifications"  element={<NotificationsPage />} />
-                  <Route path="messages"       element={<MessagesPage />} />
+                  <Route path="patients"      element={<PatientList />} />        {/* NEW */}
+                  <Route path="visits"        element={<PatientVisitList />} />    {/* NEW */}
+                  <Route path="patient/:id"   element={<PatientProfile />} />
+                  <Route path="visit/:id"     element={<VisitDetail />} />
+                  <Route path="notifications" element={<NotificationsPage />} />
+                  <Route path="messages"      element={<MessagesPage />} />
                 </Routes>
               </AppShell>
             </ProtectedRoute>
