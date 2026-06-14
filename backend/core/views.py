@@ -383,9 +383,17 @@ class ICD10CodeViewSet(viewsets.ModelViewSet):
 
 # backend/core/views.py - Complete updated PatientVisitViewSet
 
+# backend/core/views.py - Complete updated PatientVisitViewSet
+
 class PatientVisitViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing patient visits with triage, queue assignment, and status updates.
+    
+    Features:
+    - Auto-saves the nurse who performed triage
+    - Auto-creates consultation queue entry after triage
+    - Status transition validation
+    - Complete visit timeline
     """
     queryset = PatientVisit.objects.select_related(
         'patient', 'assigned_doctor', 'assigned_nurse',
@@ -426,6 +434,12 @@ class PatientVisitViewSet(viewsets.ModelViewSet):
         """
         POST /api/visits/{id}/triage/
         Submit triage assessment for a visit.
+        
+        This automatically:
+        1. Saves the nurse who performed triage (assessed_by)
+        2. Updates visit status to 'TRIAGED'
+        3. Creates a consultation queue entry for the patient
+        4. Updates visit status to 'WAITING' for doctor to see
         """
         visit = self.get_object()
         
@@ -438,21 +452,72 @@ class PatientVisitViewSet(viewsets.ModelViewSet):
         
         data = request.data.copy()
         data['visit'] = visit.id
-        data['assessed_by'] = request.user.nurse_profile.id if hasattr(request.user, 'nurse_profile') else None
         
+        # Auto-save the nurse who performed triage
+        try:
+            nurse_profile = request.user.nurse_profile
+            data['assessed_by'] = nurse_profile.id
+        except (AttributeError, Nurse.DoesNotExist):
+            try:
+                nurse = Nurse.objects.get(user=request.user)
+                data['assessed_by'] = nurse.id
+            except Nurse.DoesNotExist:
+                return Response(
+                    {'detail': 'Nurse profile not found for this user.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        # Validate and save triage assessment
         serializer = TriageAssessmentSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         triage = serializer.save()
         
-        # Update visit status
+        # Update visit status to TRIAGED
         visit.status = 'TRIAGED'
         visit.triage_time = timezone.now()
-        visit.save(update_fields=['status', 'triage_time'])
         
-        return Response(
-            TriageAssessmentSerializer(triage).data, 
-            status=status.HTTP_201_CREATED
+        # If doctor was assigned in the request, update it
+        assigned_doctor = request.data.get('assigned_doctor')
+        if assigned_doctor:
+            try:
+                doctor = Doctor.objects.get(id=assigned_doctor)
+                visit.assigned_doctor = doctor
+            except Doctor.DoesNotExist:
+                pass
+        
+        visit.save(update_fields=['status', 'triage_time', 'assigned_doctor'])
+        
+        # --- AUTO-CREATE CONSULTATION QUEUE ENTRY ---
+        # Get next queue number for CONSULTATION department today
+        today = timezone.now().date()
+        last_queue = QueueManagement.objects.filter(
+            department='CONSULTATION',
+            created_at__date=today
+        ).order_by('-queue_number').first()
+        
+        queue_number = (last_queue.queue_number + 1) if last_queue else 1
+        
+        # Create queue entry
+        queue_entry = QueueManagement.objects.create(
+            visit=visit,
+            department='CONSULTATION',
+            queue_number=queue_number,
+            priority_override=request.data.get('requires_immediate_attention', False),
+            joined_queue=timezone.now(),
+            is_active=True,
+            is_serving=False,
+            is_completed=False
         )
+        
+        # Update visit status to WAITING (so doctor can see in queue)
+        visit.status = 'WAITING'
+        visit.save(update_fields=['status'])
+        
+        return Response({
+            'triage': TriageAssessmentSerializer(triage).data,
+            'queue_entry': QueueManagementSerializer(queue_entry).data,
+            'message': 'Triage completed. Patient added to consultation queue.'
+        }, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsAnyAuthenticatedStaff])
     def assign_queue(self, request, pk=None):

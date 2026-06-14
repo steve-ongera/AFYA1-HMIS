@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { visitsAPI, lookupsAPI, doctorsAPI } from '../../services/api'
-import { Activity, Clock, User, Calendar, DollarSign } from 'lucide-react'
+import { Activity, Clock, User, Calendar, DollarSign, CheckCircle, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const normalizeList = (data) =>
@@ -79,16 +79,15 @@ export default function TriageQueue() {
       presenting_symptoms: visit.chief_complaint || '',
       allergies_noted: '',
       current_medications: '',
-      triage_notes: 'Initial assessment completed',  // Add default value
+      triage_notes: 'Initial assessment completed',
       requires_immediate_attention: false,
-      assigned_doctor: ''
+      assigned_doctor: visit.assigned_doctor?.id || ''
     })
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     
-    // Validate required fields
     if (!formData.category) {
       toast.error('Please select a triage category')
       return
@@ -102,7 +101,7 @@ export default function TriageQueue() {
     setSubmitting(true)
     
     try {
-      // Prepare triage data - ensure no null/empty strings for required fields
+      // Prepare triage data
       const triageData = {
         category: parseInt(formData.category),
         temperature: formData.temperature ? parseFloat(formData.temperature) : null,
@@ -120,23 +119,12 @@ export default function TriageQueue() {
         allergies_noted: formData.allergies_noted || '',
         current_medications: formData.current_medications || '',
         triage_notes: formData.triage_notes || 'Assessment completed',
-        requires_immediate_attention: formData.requires_immediate_attention
+        requires_immediate_attention: formData.requires_immediate_attention,
+        assigned_doctor: formData.assigned_doctor || null
       }
       
-      console.log('Submitting triage data:', triageData)
-      
-      // Step 1: Submit triage assessment
-      await visitsAPI.triage(selectedVisit.id, triageData)
-      
-      // Step 2: Update visit with assigned doctor
-      if (formData.assigned_doctor) {
-        await visitsAPI.update(selectedVisit.id, { 
-          assigned_doctor: parseInt(formData.assigned_doctor)
-        })
-      }
-      
-      // Step 3: Add to consultation queue
-      await visitsAPI.assignQueue(selectedVisit.id, { department: 'CONSULTATION' })
+      // Submit triage - backend will auto-create consultation queue
+      const response = await visitsAPI.triage(selectedVisit.id, triageData)
       
       toast.success('Triage completed! Patient sent to consultation queue.')
       
@@ -147,25 +135,24 @@ export default function TriageQueue() {
     } catch (err) {
       console.error('Failed to submit triage:', err)
       
-      // Display detailed error messages from backend
       if (err.response?.data) {
         const errors = err.response.data
-        const errorMessages = []
-        
-        Object.keys(errors).forEach(key => {
-          if (Array.isArray(errors[key])) {
-            errorMessages.push(`${key}: ${errors[key].join(', ')}`)
-          } else if (typeof errors[key] === 'string') {
-            errorMessages.push(`${key}: ${errors[key]}`)
-          } else if (errors[key]?.detail) {
-            errorMessages.push(errors[key].detail)
+        if (typeof errors === 'object') {
+          const errorMessages = []
+          Object.keys(errors).forEach(key => {
+            if (Array.isArray(errors[key])) {
+              errorMessages.push(`${key}: ${errors[key].join(', ')}`)
+            } else if (typeof errors[key] === 'string') {
+              errorMessages.push(`${key}: ${errors[key]}`)
+            }
+          })
+          if (errorMessages.length > 0) {
+            toast.error(errorMessages.join('; '))
+          } else {
+            toast.error(errors.detail || errors.message || 'Failed to submit triage')
           }
-        })
-        
-        if (errorMessages.length > 0) {
-          toast.error(errorMessages.join('; '))
         } else {
-          toast.error('Failed to submit triage assessment')
+          toast.error(String(errors))
         }
       } else {
         toast.error(err.message || 'Failed to submit triage assessment')
@@ -179,7 +166,7 @@ export default function TriageQueue() {
     if (visit.specialized_service?.consultation_fee) {
       return visit.specialized_service.consultation_fee
     }
-    return 1000
+    return 1000 // Default consultation fee
   }
 
   if (loading) {
@@ -234,7 +221,9 @@ export default function TriageQueue() {
                   >
                     <option value="">Select priority</option>
                     {categories.map(c => (
-                      <option key={c.id} value={c.id}>{c.name} — {c.color_code}</option>
+                      <option key={c.id} value={c.id}>
+                        {c.name} — {c.color_code} (Wait: {c.max_wait_time} min)
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -329,22 +318,51 @@ export default function TriageQueue() {
                 >
                   <option value="">Select doctor...</option>
                   {doctors.map(doc => (
-                    <option key={doc.id} value={doc.id}>Dr. {doc.full_name} - {doc.specialization_display || doc.specialization}</option>
+                    <option key={doc.id} value={doc.id}>
+                      Dr. {doc.full_name} - {doc.specialization_display || doc.specialization}
+                    </option>
                   ))}
                 </select>
               </div>
 
-              <label className="form-checkbox" style={{ marginBottom: 16 }}>
+              {/* Payment Summary */}
+              <div className="payment-summary" style={{ 
+                marginTop: 16, 
+                padding: 16, 
+                background: '#f0fdf4', 
+                borderRadius: 8,
+                border: '1px solid #16a34a'
+              }}>
+                <h4 style={{ margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <DollarSign size={18} color="#16a34a" />
+                  Payment Summary
+                </h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontSize: 13, color: '#5f7a7a' }}>Consultation Fee</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: '#0a6e6e' }}>
+                      KES {getConsultationFee(selectedVisit).toLocaleString()}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, color: '#5f7a7a' }}>Insurance</div>
+                    <div style={{ fontSize: 14 }}>{selectedVisit.insurance_provider?.name || 'Cash Payment'}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Urgent Care Checkbox */}
+              <label className="form-checkbox" style={{ marginTop: 16 }}>
                 <input
                   type="checkbox"
                   checked={formData.requires_immediate_attention}
                   onChange={(e) => setFormData(prev => ({ ...prev, requires_immediate_attention: e.target.checked }))}
                 />
-                Requires immediate medical attention
+                <span style={{ color: '#dc2626', fontWeight: 500 }}>⚠️ Requires immediate medical attention</span>
               </label>
             </div>
 
-            <div className="card-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: 16 }}>
+            <div className="card-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: 16, borderTop: '1px solid #d1dbd9' }}>
               <button type="button" className="btn btn-secondary" onClick={() => setSelectedVisit(null)}>Cancel</button>
               <button type="submit" className="btn btn-primary" disabled={submitting}>
                 {submitting ? 'Processing...' : 'Complete Triage & Send to Doctor'}
@@ -374,7 +392,7 @@ export default function TriageQueue() {
 
       {visits.length === 0 ? (
         <div className="empty-state">
-          <Activity size={48} style={{ opacity: 0.5 }} />
+          <CheckCircle size={48} style={{ opacity: 0.5, color: '#16a34a' }} />
           <p className="empty-state-text">No patients waiting for triage</p>
           <button className="btn btn-primary" onClick={() => navigate('/receptionist/new-visit')}>
             Register New Patient
