@@ -381,7 +381,12 @@ class ICD10CodeViewSet(viewsets.ModelViewSet):
 # VISITS, TRIAGE & QUEUE
 # ============================================================
 
+# backend/core/views.py - Complete updated PatientVisitViewSet
+
 class PatientVisitViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing patient visits with triage, queue assignment, and status updates.
+    """
     queryset = PatientVisit.objects.select_related(
         'patient', 'assigned_doctor', 'assigned_nurse',
         'insurance_provider', 'specialized_service', 'registered_by'
@@ -405,6 +410,12 @@ class PatientVisitViewSet(viewsets.ModelViewSet):
         today = self.request.query_params.get('today')
         if today:
             qs = qs.filter(arrival_time__date=timezone.now().date())
+        # Filter by triage status
+        triaged = self.request.query_params.get('triaged')
+        if triaged == 'true':
+            qs = qs.filter(triage__isnull=False)
+        elif triaged == 'false':
+            qs = qs.filter(triage__isnull=True)
         return qs
 
     def perform_create(self, serializer):
@@ -412,29 +423,73 @@ class PatientVisitViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsNurse])
     def triage(self, request, pk=None):
+        """
+        POST /api/visits/{id}/triage/
+        Submit triage assessment for a visit.
+        """
         visit = self.get_object()
+        
+        # Prevent duplicate triage
+        if hasattr(visit, 'triage'):
+            return Response(
+                {'detail': 'Triage already completed for this visit.'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
         data = request.data.copy()
         data['visit'] = visit.id
-        # Check for existing triage
-        if hasattr(visit, 'triage'):
-            serializer = TriageAssessmentSerializer(
-                visit.triage, data=data, partial=True
-            )
-        else:
-            serializer = TriageAssessmentSerializer(data=data)
+        data['assessed_by'] = request.user.nurse_profile.id if hasattr(request.user, 'nurse_profile') else None
+        
+        serializer = TriageAssessmentSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         triage = serializer.save()
+        
+        # Update visit status
         visit.status = 'TRIAGED'
         visit.triage_time = timezone.now()
         visit.save(update_fields=['status', 'triage_time'])
-        return Response(TriageAssessmentSerializer(triage).data)
+        
+        return Response(
+            TriageAssessmentSerializer(triage).data, 
+            status=status.HTTP_201_CREATED
+        )
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsAnyAuthenticatedStaff])
     def assign_queue(self, request, pk=None):
+        """
+        POST /api/visits/{id}/assign-queue/
+        Add patient to a department queue.
+        Expected payload: { "department": "CONSULTATION" }
+        """
         visit = self.get_object()
         department = request.data.get('department')
+        
         if not department:
-            return Response({'detail': 'Department is required.'}, status=400)
+            return Response(
+                {'detail': 'Department is required. Valid options: TRIAGE, CONSULTATION, LABORATORY, PHARMACY, RADIOLOGY, PROCEDURE, ADMISSION'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate department
+        valid_departments = ['TRIAGE', 'CONSULTATION', 'LABORATORY', 'PHARMACY', 'RADIOLOGY', 'PROCEDURE', 'ADMISSION']
+        if department not in valid_departments:
+            return Response(
+                {'detail': f'Invalid department. Valid options: {valid_departments}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if already in queue for this department
+        existing = QueueManagement.objects.filter(
+            visit=visit, 
+            department=department, 
+            is_completed=False
+        ).first()
+        if existing:
+            return Response(
+                {'detail': f'Patient already in {department} queue.', 'queue_entry': QueueManagementSerializer(existing).data},
+                status=status.HTTP_200_OK
+            )
+        
         # Get next queue number for this department today
         today = timezone.now().date()
         last = QueueManagement.objects.filter(
@@ -442,31 +497,144 @@ class PatientVisitViewSet(viewsets.ModelViewSet):
             created_at__date=today
         ).order_by('-queue_number').first()
         queue_number = (last.queue_number + 1) if last else 1
+        
+        # Create queue entry
         queue = QueueManagement.objects.create(
             visit=visit,
             department=department,
             queue_number=queue_number,
             priority_override=request.data.get('priority_override', False),
+            joined_queue=timezone.now()
         )
-        visit.status = 'WAITING'
-        visit.save(update_fields=['status'])
-        return Response(QueueManagementSerializer(queue).data, status=201)
+        
+        # Update visit status if needed
+        if department == 'CONSULTATION' and visit.status == 'TRIAGED':
+            visit.status = 'WAITING'
+            visit.save(update_fields=['status'])
+        
+        return Response(
+            QueueManagementSerializer(queue).data, 
+            status=status.HTTP_201_CREATED
+        )
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsAnyAuthenticatedStaff])
     def update_status(self, request, pk=None):
+        """
+        POST /api/visits/{id}/update-status/
+        Update visit status.
+        Expected payload: { "status": "IN_CONSULTATION" }
+        """
         visit = self.get_object()
         new_status = request.data.get('status')
+        
         valid = [s[0] for s in PatientVisit.STATUS_CHOICES]
         if new_status not in valid:
-            return Response({'detail': f'Invalid status. Valid: {valid}'}, status=400)
-        visit.status = new_status
+            return Response(
+                {'detail': f'Invalid status. Valid: {valid}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Status transition validation
+        current = visit.status
+        valid_transitions = {
+            'REGISTERED': ['TRIAGED', 'CANCELLED'],
+            'TRIAGED': ['WAITING', 'ADMITTED', 'CANCELLED'],
+            'WAITING': ['IN_CONSULTATION', 'CANCELLED'],
+            'IN_CONSULTATION': ['COMPLETED', 'ADMITTED', 'REFERRED'],
+            'IN_TREATMENT': ['COMPLETED', 'ADMITTED'],
+            'COMPLETED': [],
+            'ADMITTED': ['DISCHARGED'],
+            'REFERRED': [],
+            'CANCELLED': []
+        }
+        
+        if new_status not in valid_transitions.get(current, []):
+            return Response(
+                {'detail': f'Cannot transition from {current} to {new_status}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Update timestamps
         if new_status == 'IN_CONSULTATION':
             visit.consultation_start = timezone.now()
         elif new_status == 'COMPLETED':
             visit.consultation_end = timezone.now()
             visit.discharge_time = timezone.now()
+        
+        visit.status = new_status
         visit.save()
+        
+        # If completed, mark queue entries as completed
+        if new_status == 'COMPLETED':
+            QueueManagement.objects.filter(visit=visit, is_completed=False).update(
+                is_completed=True,
+                is_active=False,
+                service_end=timezone.now()
+            )
+        
         return Response(PatientVisitSerializer(visit).data)
+
+    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated, IsAnyAuthenticatedStaff])
+    def queue_status(self, request, pk=None):
+        """
+        GET /api/visits/{id}/queue-status/
+        Get all queue entries for this visit.
+        """
+        visit = self.get_object()
+        queue_entries = QueueManagement.objects.filter(visit=visit).order_by('joined_queue')
+        return Response(QueueManagementSerializer(queue_entries, many=True).data)
+
+    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated, IsAnyAuthenticatedStaff])
+    def timeline(self, request, pk=None):
+        """
+        GET /api/visits/{id}/timeline/
+        Get complete timeline of the visit (registration, triage, consultations, etc.)
+        """
+        visit = self.get_object()
+        
+        timeline = []
+        
+        # Registration
+        timeline.append({
+            'event': 'Registration',
+            'timestamp': visit.created_at.isoformat(),
+            'details': f'Registered by {visit.registered_by.get_full_name() if visit.registered_by else "System"}'
+        })
+        
+        # Triage
+        if hasattr(visit, 'triage'):
+            timeline.append({
+                'event': 'Triage',
+                'timestamp': visit.triage.assessment_time.isoformat(),
+                'details': f'Category: {visit.triage.category.name}, Pain Score: {visit.triage.pain_score}/10'
+            })
+        
+        # Queue entries
+        queue_entries = QueueManagement.objects.filter(visit=visit).order_by('joined_queue')
+        for queue in queue_entries:
+            timeline.append({
+                'event': f'Queue Entry - {queue.get_department_display()}',
+                'timestamp': queue.joined_queue.isoformat(),
+                'details': f'Queue #{queue.queue_number}, Called: {queue.called_time.isoformat() if queue.called_time else "Pending"}'
+            })
+        
+        # Consultation
+        if hasattr(visit, 'consultation'):
+            timeline.append({
+                'event': 'Consultation',
+                'timestamp': visit.consultation.created_at.isoformat(),
+                'details': f'Diagnosis: {visit.consultation.diagnosis[:100]}...'
+            })
+        
+        # Completion
+        if visit.status == 'COMPLETED':
+            timeline.append({
+                'event': 'Visit Completed',
+                'timestamp': visit.discharge_time.isoformat() if visit.discharge_time else timezone.now().isoformat(),
+                'details': 'Patient discharged'
+            })
+        
+        return Response(timeline)
 
 
 class QueueManagementViewSet(viewsets.ModelViewSet):
@@ -2272,4 +2440,29 @@ class ReportsView(APIView):
                 status=400
             )
 
+
+
+# Add to backend/core/views.py
+
+class TriageAssessmentViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing triage assessments.
+    """
+    queryset = TriageAssessment.objects.select_related(
+        'visit__patient', 'category', 'assessed_by'
+    ).order_by('-assessment_time')
+    serializer_class = TriageAssessmentSerializer
+    permission_classes = [IsAuthenticated, IsAnyAuthenticatedStaff]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['category', 'requires_immediate_attention']
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        date = self.request.query_params.get('date')
+        if date:
+            qs = qs.filter(assessment_time__date=date)
+        return qs
+    
+    
+    
 

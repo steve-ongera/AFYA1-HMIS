@@ -45,48 +45,64 @@ export default function TriageQueue() {
   const loadData = async () => {
     try {
       setLoading(true)
-      // Get visits that are registered but not triaged yet
       const [visitsData, categoriesData, doctorsData] = await Promise.all([
         visitsAPI.list({ status: 'REGISTERED' }),
         lookupsAPI.triageCategories(),
         doctorsAPI.list({ is_active: true })
       ])
-      console.log('Visits data:', visitsData)  // Debug: see what's coming back
-      console.log('Categories:', categoriesData)  // Debug: see categories
-      console.log('Doctors:', doctorsData)  // Debug: see doctors
-      
       setVisits(normalizeList(visitsData))
       setCategories(normalizeList(categoriesData))
       setDoctors(normalizeList(doctorsData))
     } catch (err) {
       console.error('Failed to load data', err)
-      toast.error('Failed to load triage queue: ' + (err.message || 'Unknown error'))
+      toast.error('Failed to load triage queue')
     } finally {
       setLoading(false)
     }
   }
 
   const startTriage = (visit) => {
-    console.log('Starting triage for visit:', visit)  // Debug
     setSelectedVisit(visit)
     setFormData({
-      ...formData,
-      presenting_symptoms: visit.chief_complaint || ''
+      category: '',
+      temperature: '',
+      blood_pressure_systolic: '',
+      blood_pressure_diastolic: '',
+      pulse_rate: '',
+      respiratory_rate: '',
+      oxygen_saturation: '',
+      weight: '',
+      height: '',
+      consciousness_level: 'ALERT',
+      breathing_status: 'NORMAL',
+      pain_score: 0,
+      presenting_symptoms: visit.chief_complaint || '',
+      allergies_noted: '',
+      current_medications: '',
+      triage_notes: 'Initial assessment completed',  // Add default value
+      requires_immediate_attention: false,
+      assigned_doctor: ''
     })
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     
+    // Validate required fields
     if (!formData.category) {
       toast.error('Please select a triage category')
+      return
+    }
+    
+    if (!formData.presenting_symptoms) {
+      toast.error('Please enter presenting symptoms')
       return
     }
     
     setSubmitting(true)
     
     try {
-      // Prepare the data for the API
+      // Prepare triage data - ensure no null/empty strings for required fields
       const triageData = {
         category: parseInt(formData.category),
         temperature: formData.temperature ? parseFloat(formData.temperature) : null,
@@ -99,31 +115,28 @@ export default function TriageQueue() {
         height: formData.height ? parseFloat(formData.height) : null,
         consciousness_level: formData.consciousness_level,
         breathing_status: formData.breathing_status,
-        pain_score: formData.pain_score,
+        pain_score: parseInt(formData.pain_score) || 0,
         presenting_symptoms: formData.presenting_symptoms,
-        allergies_noted: formData.allergies_noted,
-        current_medications: formData.current_medications,
-        triage_notes: formData.triage_notes,
+        allergies_noted: formData.allergies_noted || '',
+        current_medications: formData.current_medications || '',
+        triage_notes: formData.triage_notes || 'Assessment completed',
         requires_immediate_attention: formData.requires_immediate_attention
       }
       
-      console.log('Submitting triage data:', triageData)  // Debug
+      console.log('Submitting triage data:', triageData)
       
       // Step 1: Submit triage assessment
       await visitsAPI.triage(selectedVisit.id, triageData)
-      console.log('Triage submitted successfully')
       
       // Step 2: Update visit with assigned doctor
       if (formData.assigned_doctor) {
         await visitsAPI.update(selectedVisit.id, { 
           assigned_doctor: parseInt(formData.assigned_doctor)
         })
-        console.log('Doctor assigned')
       }
       
       // Step 3: Add to consultation queue
       await visitsAPI.assignQueue(selectedVisit.id, { department: 'CONSULTATION' })
-      console.log('Added to consultation queue')
       
       toast.success('Triage completed! Patient sent to consultation queue.')
       
@@ -132,17 +145,13 @@ export default function TriageQueue() {
       loadData()
       
     } catch (err) {
-      console.error('Failed to submit triage - Full error:', err)
-      console.error('Error response:', err.response)
-      console.error('Error status:', err.response?.status)
-      console.error('Error data:', err.response?.data)
+      console.error('Failed to submit triage:', err)
       
-      if (err.response?.status === 404) {
-        toast.error('API endpoint not found. Please check your backend URL configuration.')
-      } else if (err.response?.data) {
-        // Display validation errors from backend
+      // Display detailed error messages from backend
+      if (err.response?.data) {
         const errors = err.response.data
         const errorMessages = []
+        
         Object.keys(errors).forEach(key => {
           if (Array.isArray(errors[key])) {
             errorMessages.push(`${key}: ${errors[key].join(', ')}`)
@@ -152,7 +161,12 @@ export default function TriageQueue() {
             errorMessages.push(errors[key].detail)
           }
         })
-        toast.error(errorMessages.join('; ') || 'Failed to submit triage')
+        
+        if (errorMessages.length > 0) {
+          toast.error(errorMessages.join('; '))
+        } else {
+          toast.error('Failed to submit triage assessment')
+        }
       } else {
         toast.error(err.message || 'Failed to submit triage assessment')
       }
@@ -165,7 +179,7 @@ export default function TriageQueue() {
     if (visit.specialized_service?.consultation_fee) {
       return visit.specialized_service.consultation_fee
     }
-    return 1000 // Default consultation fee
+    return 1000
   }
 
   if (loading) {
@@ -268,10 +282,42 @@ export default function TriageQueue() {
                 </select>
               </div>
 
-              <textarea className="form-textarea" rows="2" placeholder="Presenting Symptoms" required value={formData.presenting_symptoms} onChange={(e) => setFormData(prev => ({ ...prev, presenting_symptoms: e.target.value }))} style={{ marginBottom: 16 }} />
-              <textarea className="form-textarea" rows="2" placeholder="Allergies" value={formData.allergies_noted} onChange={(e) => setFormData(prev => ({ ...prev, allergies_noted: e.target.value }))} style={{ marginBottom: 16 }} />
-              <textarea className="form-textarea" rows="2" placeholder="Current Medications" value={formData.current_medications} onChange={(e) => setFormData(prev => ({ ...prev, current_medications: e.target.value }))} style={{ marginBottom: 16 }} />
-              <textarea className="form-textarea" rows="2" placeholder="Triage Notes" value={formData.triage_notes} onChange={(e) => setFormData(prev => ({ ...prev, triage_notes: e.target.value }))} style={{ marginBottom: 16 }} />
+              <textarea 
+                className="form-textarea" 
+                rows="2" 
+                placeholder="Presenting Symptoms" 
+                required 
+                value={formData.presenting_symptoms} 
+                onChange={(e) => setFormData(prev => ({ ...prev, presenting_symptoms: e.target.value }))} 
+                style={{ marginBottom: 16 }} 
+              />
+              
+              <textarea 
+                className="form-textarea" 
+                rows="2" 
+                placeholder="Allergies" 
+                value={formData.allergies_noted} 
+                onChange={(e) => setFormData(prev => ({ ...prev, allergies_noted: e.target.value }))} 
+                style={{ marginBottom: 16 }} 
+              />
+              
+              <textarea 
+                className="form-textarea" 
+                rows="2" 
+                placeholder="Current Medications" 
+                value={formData.current_medications} 
+                onChange={(e) => setFormData(prev => ({ ...prev, current_medications: e.target.value }))} 
+                style={{ marginBottom: 16 }} 
+              />
+              
+              <textarea 
+                className="form-textarea" 
+                rows="2" 
+                placeholder="Triage Notes" 
+                value={formData.triage_notes} 
+                onChange={(e) => setFormData(prev => ({ ...prev, triage_notes: e.target.value }))} 
+                style={{ marginBottom: 16 }} 
+              />
 
               {/* Assign Doctor */}
               <div className="form-group" style={{ marginBottom: 16 }}>

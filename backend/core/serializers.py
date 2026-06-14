@@ -1836,3 +1836,8 @@ class DashboardStatsSerializer(serializers.Serializer):
     total_doctors = serializers.IntegerField(required=False)
     total_nurses = serializers.IntegerField(required=False)
     assets_maintenance_due = serializers.IntegerField(required=False)
+    
+    
+    
+    
+    
