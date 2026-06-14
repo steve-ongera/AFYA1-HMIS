@@ -2459,3 +2459,12 @@ INFO 2026-06-14 13:57:36,635 autoreload 15424 6432 Watching for file changes wit
 INFO 2026-06-14 13:58:13,755 basehttp 15424 5824 "GET /api/notifications/unread_count/ HTTP/1.1" 200 18
 INFO 2026-06-14 13:58:17,375 autoreload 15424 6432 D:\BACKUP\Complete Projects\afya1_hmis\backend\core\serializers.py changed, reloading.
 INFO 2026-06-14 13:58:18,970 autoreload 8832 5948 Watching for file changes with StatReloader
+INFO 2026-06-14 13:59:03,446 basehttp 8832 8728 "POST /api/auth/refresh/ HTTP/1.1" 200 270
+INFO 2026-06-14 13:59:03,446 basehttp 8832 6364 "POST /api/auth/refresh/ HTTP/1.1" 200 270
+INFO 2026-06-14 13:59:03,490 basehttp 8832 6364 "GET /api/auth/me/ HTTP/1.1" 200 242
+INFO 2026-06-14 13:59:03,537 basehttp 8832 8728 "GET /api/auth/me/ HTTP/1.1" 200 242
+INFO 2026-06-14 13:59:03,630 basehttp 8832 6364 "GET /api/notifications/unread_count/ HTTP/1.1" 200 18
+INFO 2026-06-14 13:59:03,642 basehttp 8832 8728 "GET /api/notifications/unread_count/ HTTP/1.1" 200 18
+INFO 2026-06-14 13:59:03,655 basehttp 8832 6364 "GET /api/notifications/unread_count/ HTTP/1.1" 200 18
+INFO 2026-06-14 13:59:03,862 basehttp 8832 6364 "GET /api/users/ HTTP/1.1" 200 2328
+INFO 2026-06-14 13:59:03,886 basehttp 8832 8728 "GET /api/users/ HTTP/1.1" 200 2328
