@@ -1,22 +1,22 @@
 // pages/nurse/TriageQueue.jsx
 import React, { useState, useEffect } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
-import { queueAPI, visitsAPI, lookupsAPI } from '../../services/api'
+import { useNavigate } from 'react-router-dom'
+import { visitsAPI, lookupsAPI, doctorsAPI } from '../../services/api'
+import { Activity, Clock, User, Calendar, DollarSign } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 const normalizeList = (data) =>
   Array.isArray(data) ? data : (data?.results ?? [])
 
 export default function TriageQueue() {
   const navigate = useNavigate()
-  const location = useLocation()
-  const queryParams = new URLSearchParams(location.search)
-  const selectedVisitId = queryParams.get('visit')
-
-  const [queue, setQueue] = useState([])
-  const [selectedVisit, setSelectedVisit] = useState(null)
-  const [categories, setCategories] = useState([])
+  const [visits, setVisits] = useState([])
   const [loading, setLoading] = useState(true)
-  const [assessing, setAssessing] = useState(false)
+  const [categories, setCategories] = useState([])
+  const [doctors, setDoctors] = useState([])
+  const [selectedVisit, setSelectedVisit] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+
   const [formData, setFormData] = useState({
     category: '',
     temperature: '',
@@ -34,73 +34,139 @@ export default function TriageQueue() {
     allergies_noted: '',
     current_medications: '',
     triage_notes: '',
-    requires_immediate_attention: false
+    requires_immediate_attention: false,
+    assigned_doctor: ''
   })
-
-  const emptyForm = {
-    category: '', temperature: '', blood_pressure_systolic: '', blood_pressure_diastolic: '',
-    pulse_rate: '', respiratory_rate: '', oxygen_saturation: '', weight: '', height: '',
-    consciousness_level: 'ALERT', breathing_status: 'NORMAL', pain_score: 0,
-    presenting_symptoms: '', allergies_noted: '', current_medications: '', triage_notes: '',
-    requires_immediate_attention: false
-  }
 
   useEffect(() => {
     loadData()
   }, [])
 
-  useEffect(() => {
-    if (selectedVisitId) {
-      loadVisit(selectedVisitId)
-    }
-  }, [selectedVisitId])
-
   const loadData = async () => {
     try {
-      const [queueData, categoriesData] = await Promise.all([
-        queueAPI.byDept('TRIAGE'),
-        lookupsAPI.triageCategories()
+      setLoading(true)
+      // Get visits that are registered but not triaged yet
+      const [visitsData, categoriesData, doctorsData] = await Promise.all([
+        visitsAPI.list({ status: 'REGISTERED' }),
+        lookupsAPI.triageCategories(),
+        doctorsAPI.list({ is_active: true })
       ])
-      setQueue(normalizeList(queueData))
+      console.log('Visits data:', visitsData)  // Debug: see what's coming back
+      console.log('Categories:', categoriesData)  // Debug: see categories
+      console.log('Doctors:', doctorsData)  // Debug: see doctors
+      
+      setVisits(normalizeList(visitsData))
       setCategories(normalizeList(categoriesData))
+      setDoctors(normalizeList(doctorsData))
     } catch (err) {
       console.error('Failed to load data', err)
+      toast.error('Failed to load triage queue: ' + (err.message || 'Unknown error'))
     } finally {
       setLoading(false)
     }
   }
 
-  const loadVisit = async (id) => {
-    try {
-      const data = await visitsAPI.get(id)
-      setSelectedVisit(data)
-      setFormData(prev => ({ ...prev, presenting_symptoms: data.chief_complaint }))
-    } catch (err) {
-      console.error('Failed to load visit', err)
-    }
+  const startTriage = (visit) => {
+    console.log('Starting triage for visit:', visit)  // Debug
+    setSelectedVisit(visit)
+    setFormData({
+      ...formData,
+      presenting_symptoms: visit.chief_complaint || ''
+    })
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setAssessing(true)
+    
+    if (!formData.category) {
+      toast.error('Please select a triage category')
+      return
+    }
+    
+    setSubmitting(true)
+    
     try {
-      await visitsAPI.triage(selectedVisit.id, formData)
+      // Prepare the data for the API
+      const triageData = {
+        category: parseInt(formData.category),
+        temperature: formData.temperature ? parseFloat(formData.temperature) : null,
+        blood_pressure_systolic: formData.blood_pressure_systolic ? parseInt(formData.blood_pressure_systolic) : null,
+        blood_pressure_diastolic: formData.blood_pressure_diastolic ? parseInt(formData.blood_pressure_diastolic) : null,
+        pulse_rate: formData.pulse_rate ? parseInt(formData.pulse_rate) : null,
+        respiratory_rate: formData.respiratory_rate ? parseInt(formData.respiratory_rate) : null,
+        oxygen_saturation: formData.oxygen_saturation ? parseInt(formData.oxygen_saturation) : null,
+        weight: formData.weight ? parseFloat(formData.weight) : null,
+        height: formData.height ? parseFloat(formData.height) : null,
+        consciousness_level: formData.consciousness_level,
+        breathing_status: formData.breathing_status,
+        pain_score: formData.pain_score,
+        presenting_symptoms: formData.presenting_symptoms,
+        allergies_noted: formData.allergies_noted,
+        current_medications: formData.current_medications,
+        triage_notes: formData.triage_notes,
+        requires_immediate_attention: formData.requires_immediate_attention
+      }
+      
+      console.log('Submitting triage data:', triageData)  // Debug
+      
+      // Step 1: Submit triage assessment
+      await visitsAPI.triage(selectedVisit.id, triageData)
+      console.log('Triage submitted successfully')
+      
+      // Step 2: Update visit with assigned doctor
+      if (formData.assigned_doctor) {
+        await visitsAPI.update(selectedVisit.id, { 
+          assigned_doctor: parseInt(formData.assigned_doctor)
+        })
+        console.log('Doctor assigned')
+      }
+      
+      // Step 3: Add to consultation queue
       await visitsAPI.assignQueue(selectedVisit.id, { department: 'CONSULTATION' })
-      await loadData()
+      console.log('Added to consultation queue')
+      
+      toast.success('Triage completed! Patient sent to consultation queue.')
+      
+      // Reset and reload
       setSelectedVisit(null)
-      setFormData(emptyForm)
+      loadData()
+      
     } catch (err) {
-      console.error('Failed to submit triage', err)
-      alert(err.message || 'Failed to submit triage assessment')
+      console.error('Failed to submit triage - Full error:', err)
+      console.error('Error response:', err.response)
+      console.error('Error status:', err.response?.status)
+      console.error('Error data:', err.response?.data)
+      
+      if (err.response?.status === 404) {
+        toast.error('API endpoint not found. Please check your backend URL configuration.')
+      } else if (err.response?.data) {
+        // Display validation errors from backend
+        const errors = err.response.data
+        const errorMessages = []
+        Object.keys(errors).forEach(key => {
+          if (Array.isArray(errors[key])) {
+            errorMessages.push(`${key}: ${errors[key].join(', ')}`)
+          } else if (typeof errors[key] === 'string') {
+            errorMessages.push(`${key}: ${errors[key]}`)
+          } else if (errors[key]?.detail) {
+            errorMessages.push(errors[key].detail)
+          }
+        })
+        toast.error(errorMessages.join('; ') || 'Failed to submit triage')
+      } else {
+        toast.error(err.message || 'Failed to submit triage assessment')
+      }
     } finally {
-      setAssessing(false)
+      setSubmitting(false)
     }
   }
 
-  const field = (key) => ({
-    value: formData[key],
-    onChange: (e) => setFormData(prev => ({ ...prev, [key]: e.target.value }))
-  })
+  const getConsultationFee = (visit) => {
+    if (visit.specialized_service?.consultation_fee) {
+      return visit.specialized_service.consultation_fee
+    }
+    return 1000 // Default consultation fee
+  }
 
   if (loading) {
     return (
@@ -113,159 +179,216 @@ export default function TriageQueue() {
     )
   }
 
-  return (
-    <div className="page">
-      <div className="page-header">
-        <div className="page-title-group">
-          <h1 className="page-title">Triage Queue</h1>
-          <p className="page-subtitle">Assess and prioritize patients</p>
+  // Show triage form if a visit is selected
+  if (selectedVisit) {
+    return (
+      <div className="page">
+        <div className="page-header">
+          <div className="page-title-group">
+            <h1 className="page-title">Triage Assessment</h1>
+            <p className="page-subtitle">
+              {selectedVisit.patient_info?.full_name} • Visit #{selectedVisit.visit_number}
+            </p>
+          </div>
+          <button className="btn btn-secondary" onClick={() => setSelectedVisit(null)}>
+            ← Back to Queue
+          </button>
         </div>
-      </div>
 
-      {!selectedVisit ? (
-        <>
-          {queue.length === 0 ? (
-            <div className="empty-state">
-              <i className="bi bi-check-circle" style={{ fontSize: 48, opacity: 0.5 }}></i>
-              <p className="empty-state-text">No patients waiting for triage</p>
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gap: 12 }}>
-              {queue.map((item) => (
-                <div key={item.id} className="queue-card">
-                  <div className="queue-number">{item.queue_number}</div>
-                  <div className="queue-info">
-                    <div className="queue-name">{item.patient_name}</div>
-                    <div className="queue-meta">Visit: {item.patient_visit_number} • Arrived: {new Date(item.joined_queue).toLocaleTimeString()}</div>
-                    <div className="queue-meta">Chief complaint: {item.visit?.chief_complaint?.substring(0, 100)}</div>
-                  </div>
-                  <button className="btn btn-primary" onClick={() => loadVisit(item.visit)}>
-                    <i className="bi bi-clipboard2-pulse"></i> Start Assessment
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      ) : (
         <form onSubmit={handleSubmit}>
           <div className="card">
-            <div className="card-header">
-              <h3 className="card-title">Triage Assessment — {selectedVisit.patient_info?.full_name}</h3>
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSelectedVisit(null)}>
-                <i className="bi bi-arrow-left"></i> Back to Queue
-              </button>
-            </div>
             <div className="card-body">
-              <div className="info-grid" style={{ marginBottom: 24 }}>
-                <div className="info-item"><div className="info-label">Visit #</div><div className="info-value">{selectedVisit.visit_number}</div></div>
-                <div className="info-item"><div className="info-label">Age</div><div className="info-value">{selectedVisit.patient_info?.age}</div></div>
-                <div className="info-item"><div className="info-label">Gender</div><div className="info-value">{selectedVisit.patient_info?.gender === 'M' ? 'Male' : 'Female'}</div></div>
-                <div className="info-item"><div className="info-label">Chief Complaint</div><div className="info-value">{selectedVisit.chief_complaint}</div></div>
+              {/* Patient Info */}
+              <div className="info-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24, padding: 16, background: '#f0f4f8', borderRadius: 8 }}>
+                <div><strong>Patient:</strong> {selectedVisit.patient_info?.full_name}</div>
+                <div><strong>Age:</strong> {selectedVisit.patient_info?.age} yrs</div>
+                <div><strong>Gender:</strong> {selectedVisit.patient_info?.gender === 'M' ? 'Male' : 'Female'}</div>
+                <div><strong>Consultation Fee:</strong> <span style={{ color: '#0a6e6e', fontWeight: 'bold' }}>KES {getConsultationFee(selectedVisit).toLocaleString()}</span></div>
+                <div><strong>Chief Complaint:</strong> {selectedVisit.chief_complaint}</div>
+                <div><strong>Visit Type:</strong> {selectedVisit.visit_type_display || selectedVisit.visit_type}</div>
               </div>
 
-              <div className="form-row">
+              {/* Triage Category */}
+              <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
                 <div className="form-group">
                   <label className="form-label required">Triage Category</label>
-                  <select className="form-select" required {...field('category')}>
-                    <option value="">Select priority level</option>
+                  <select 
+                    className="form-select" 
+                    required 
+                    value={formData.category}
+                    onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                  >
+                    <option value="">Select priority</option>
                     {categories.map(c => (
-                      <option key={c.id} value={c.id}>{c.name} — {c.color_code} ({c.max_wait_time} min)</option>
+                      <option key={c.id} value={c.id}>{c.name} — {c.color_code}</option>
                     ))}
                   </select>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Pain Score (0–10)</label>
+                  <label className="form-label">Pain Score (0-10)</label>
                   <input
-                    type="number" min="0" max="10" className="form-input"
+                    type="number"
+                    min="0"
+                    max="10"
+                    className="form-input"
                     value={formData.pain_score}
                     onChange={(e) => setFormData(prev => ({ ...prev, pain_score: parseInt(e.target.value) || 0 }))}
                   />
                 </div>
               </div>
 
-              <div className="form-row">
-                <div className="form-group"><label>Temperature (°C)</label><input type="number" step="0.1" className="form-input" {...field('temperature')} /></div>
-                <div className="form-group"><label>BP Systolic</label><input type="number" className="form-input" {...field('blood_pressure_systolic')} /></div>
-                <div className="form-group"><label>BP Diastolic</label><input type="number" className="form-input" {...field('blood_pressure_diastolic')} /></div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group"><label>Pulse Rate</label><input type="number" className="form-input" {...field('pulse_rate')} /></div>
-                <div className="form-group"><label>Respiratory Rate</label><input type="number" className="form-input" {...field('respiratory_rate')} /></div>
-                <div className="form-group"><label>O2 Saturation (%)</label><input type="number" className="form-input" {...field('oxygen_saturation')} /></div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group"><label>Weight (kg)</label><input type="number" step="0.1" className="form-input" {...field('weight')} /></div>
-                <div className="form-group"><label>Height (cm)</label><input type="number" step="0.1" className="form-input" {...field('height')} /></div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Consciousness Level</label>
-                  <select className="form-select" {...field('consciousness_level')}>
-                    <option value="ALERT">Alert</option>
-                    <option value="VERBAL">Verbal</option>
-                    <option value="PAIN">Pain</option>
-                    <option value="UNRESPONSIVE">Unresponsive</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Breathing Status</label>
-                  <select className="form-select" {...field('breathing_status')}>
-                    <option value="NORMAL">Normal</option>
-                    <option value="LABORED">Labored</option>
-                    <option value="SHALLOW">Shallow</option>
-                    <option value="ABSENT">Absent</option>
-                  </select>
+              {/* Vitals */}
+              <div style={{ marginBottom: 20 }}>
+                <h4>Vital Signs</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+                  <input type="number" step="0.1" className="form-input" placeholder="Temp (°C)" value={formData.temperature} onChange={(e) => setFormData(prev => ({ ...prev, temperature: e.target.value }))} />
+                  <input type="number" className="form-input" placeholder="BP Systolic" value={formData.blood_pressure_systolic} onChange={(e) => setFormData(prev => ({ ...prev, blood_pressure_systolic: e.target.value }))} />
+                  <input type="number" className="form-input" placeholder="BP Diastolic" value={formData.blood_pressure_diastolic} onChange={(e) => setFormData(prev => ({ ...prev, blood_pressure_diastolic: e.target.value }))} />
+                  <input type="number" className="form-input" placeholder="Pulse Rate" value={formData.pulse_rate} onChange={(e) => setFormData(prev => ({ ...prev, pulse_rate: e.target.value }))} />
+                  <input type="number" className="form-input" placeholder="Respiratory Rate" value={formData.respiratory_rate} onChange={(e) => setFormData(prev => ({ ...prev, respiratory_rate: e.target.value }))} />
+                  <input type="number" className="form-input" placeholder="O2 Saturation %" value={formData.oxygen_saturation} onChange={(e) => setFormData(prev => ({ ...prev, oxygen_saturation: e.target.value }))} />
+                  <input type="number" step="0.1" className="form-input" placeholder="Weight (kg)" value={formData.weight} onChange={(e) => setFormData(prev => ({ ...prev, weight: e.target.value }))} />
+                  <input type="number" step="0.1" className="form-input" placeholder="Height (cm)" value={formData.height} onChange={(e) => setFormData(prev => ({ ...prev, height: e.target.value }))} />
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label required">Presenting Symptoms</label>
-                <textarea className="form-textarea" rows="3" required {...field('presenting_symptoms')}></textarea>
+              {/* Assessment */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
+                <select className="form-select" value={formData.consciousness_level} onChange={(e) => setFormData(prev => ({ ...prev, consciousness_level: e.target.value }))}>
+                  <option value="ALERT">Alert</option>
+                  <option value="VERBAL">Verbal</option>
+                  <option value="PAIN">Pain</option>
+                  <option value="UNRESPONSIVE">Unresponsive</option>
+                </select>
+                <select className="form-select" value={formData.breathing_status} onChange={(e) => setFormData(prev => ({ ...prev, breathing_status: e.target.value }))}>
+                  <option value="NORMAL">Normal</option>
+                  <option value="LABORED">Labored</option>
+                  <option value="SHALLOW">Shallow</option>
+                  <option value="ABSENT">Absent</option>
+                </select>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Allergies Noted</label>
-                <textarea className="form-textarea" rows="2" {...field('allergies_noted')}></textarea>
+              <textarea className="form-textarea" rows="2" placeholder="Presenting Symptoms" required value={formData.presenting_symptoms} onChange={(e) => setFormData(prev => ({ ...prev, presenting_symptoms: e.target.value }))} style={{ marginBottom: 16 }} />
+              <textarea className="form-textarea" rows="2" placeholder="Allergies" value={formData.allergies_noted} onChange={(e) => setFormData(prev => ({ ...prev, allergies_noted: e.target.value }))} style={{ marginBottom: 16 }} />
+              <textarea className="form-textarea" rows="2" placeholder="Current Medications" value={formData.current_medications} onChange={(e) => setFormData(prev => ({ ...prev, current_medications: e.target.value }))} style={{ marginBottom: 16 }} />
+              <textarea className="form-textarea" rows="2" placeholder="Triage Notes" value={formData.triage_notes} onChange={(e) => setFormData(prev => ({ ...prev, triage_notes: e.target.value }))} style={{ marginBottom: 16 }} />
+
+              {/* Assign Doctor */}
+              <div className="form-group" style={{ marginBottom: 16 }}>
+                <label className="form-label">Assign Doctor</label>
+                <select 
+                  className="form-select"
+                  value={formData.assigned_doctor}
+                  onChange={(e) => setFormData(prev => ({ ...prev, assigned_doctor: e.target.value }))}
+                >
+                  <option value="">Select doctor...</option>
+                  {doctors.map(doc => (
+                    <option key={doc.id} value={doc.id}>Dr. {doc.full_name} - {doc.specialization_display || doc.specialization}</option>
+                  ))}
+                </select>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Current Medications</label>
-                <textarea className="form-textarea" rows="2" {...field('current_medications')}></textarea>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Triage Notes</label>
-                <textarea className="form-textarea" rows="2" {...field('triage_notes')}></textarea>
-              </div>
-
-              <div className="form-group">
-                <label className="form-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={formData.requires_immediate_attention}
-                    onChange={(e) => setFormData(prev => ({ ...prev, requires_immediate_attention: e.target.checked }))}
-                  />
-                  Requires immediate medical attention
-                </label>
-              </div>
+              <label className="form-checkbox" style={{ marginBottom: 16 }}>
+                <input
+                  type="checkbox"
+                  checked={formData.requires_immediate_attention}
+                  onChange={(e) => setFormData(prev => ({ ...prev, requires_immediate_attention: e.target.checked }))}
+                />
+                Requires immediate medical attention
+              </label>
             </div>
 
-            <div className="card-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+            <div className="card-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: 16 }}>
               <button type="button" className="btn btn-secondary" onClick={() => setSelectedVisit(null)}>Cancel</button>
-              <button type="submit" className="btn btn-primary" disabled={assessing}>
-                {assessing
-                  ? <><span className="spinner" style={{ width: 16, height: 16 }}></span> Submitting...</>
-                  : 'Complete Assessment & Send to Queue'
-                }
+              <button type="submit" className="btn btn-primary" disabled={submitting}>
+                {submitting ? 'Processing...' : 'Complete Triage & Send to Doctor'}
               </button>
             </div>
           </div>
         </form>
+      </div>
+    )
+  }
+
+  // Show list of visits
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div className="page-title-group">
+          <h1 className="page-title">
+            <Activity className="inline-icon" size={28} />
+            Triage Queue
+          </h1>
+          <p className="page-subtitle">Patients waiting for triage assessment</p>
+        </div>
+        <button className="btn btn-outline" onClick={loadData}>
+          Refresh
+        </button>
+      </div>
+
+      {visits.length === 0 ? (
+        <div className="empty-state">
+          <Activity size={48} style={{ opacity: 0.5 }} />
+          <p className="empty-state-text">No patients waiting for triage</p>
+          <button className="btn btn-primary" onClick={() => navigate('/receptionist/new-visit')}>
+            Register New Patient
+          </button>
+        </div>
+      ) : (
+        <div className="visits-list" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {visits.map((visit) => (
+            <div key={visit.id} className="visit-card" style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between',
+              padding: 16,
+              background: 'white',
+              borderRadius: 8,
+              border: '1px solid #d1dbd9',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+            }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                  <User size={18} color="#0a6e6e" />
+                  <strong style={{ fontSize: 16 }}>{visit.patient_info?.full_name}</strong>
+                  <span className="badge badge-info">Visit: {visit.visit_number}</span>
+                  <span className="badge badge-primary">Fee: KES {getConsultationFee(visit).toLocaleString()}</span>
+                </div>
+                <div style={{ display: 'flex', gap: 20, fontSize: 13, color: '#5f7a7a' }}>
+                  <span><Clock size={14} style={{ display: 'inline', marginRight: 4 }} /> Arrived: {new Date(visit.arrival_time).toLocaleTimeString()}</span>
+                  <span><Calendar size={14} style={{ display: 'inline', marginRight: 4 }} /> {visit.visit_type_display || visit.visit_type}</span>
+                </div>
+                <div style={{ fontSize: 13, color: '#5f7a7a', marginTop: 4 }}>
+                  <strong>Chief complaint:</strong> {visit.chief_complaint}
+                </div>
+              </div>
+              <button 
+                className="btn btn-primary" 
+                onClick={() => startTriage(visit)}
+                style={{ minWidth: 140 }}
+              >
+                <Activity size={16} /> Start Triage
+              </button>
+            </div>
+          ))}
+        </div>
       )}
+
+      <style jsx>{`
+        .inline-icon {
+          vertical-align: middle;
+          margin-right: 8px;
+        }
+        .btn-outline {
+          background: transparent;
+          border: 1px solid #0a6e6e;
+          color: #0a6e6e;
+        }
+        .btn-outline:hover {
+          background: #0a6e6e;
+          color: white;
+        }
+      `}</style>
     </div>
   )
 }

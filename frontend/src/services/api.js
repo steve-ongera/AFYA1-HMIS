@@ -162,9 +162,9 @@ export const visitsAPI = {
   get:          (id)       => get(`/visits/${id}/`),
   create:       (data)     => post('/visits/', data),
   update:       (id, data) => patch(`/visits/${id}/`, data),
-  triage:       (id, data) => post(`/visits/${id}/triage/`, data),
-  assignQueue:  (id, data) => post(`/visits/${id}/assign-queue/`, data),  // FIXED: underscore to hyphen
-  updateStatus: (id, data) => post(`/visits/${id}/update-status/`, data),  // FIXED: underscore to hyphen
+  triage:       (id, data) => post(`/visits/${id}/triage/`, data),  // ✅ This is correct - your backend uses /triage/
+  assignQueue:  (id, data) => post(`/visits/${id}/assign-queue/`, data),  // ✅ Fixed: assign-queue (hyphen)
+  updateStatus: (id, data) => post(`/visits/${id}/update-status/`, data),  // ✅ Fixed: update-status (hyphen)
 }
 
 export const queueAPI = {
