@@ -29,7 +29,6 @@ api.interceptors.request.use(
 )
 
 // ── Response interceptor — unwrap data, normalise errors ──────────────────────
-// The 401 retry logic lives in AuthContext to avoid circular deps.
 api.interceptors.response.use(
   (res) => res,
   (err) => {
@@ -104,9 +103,10 @@ export const patientsAPI = {
   update:        (id, data) => patch(`/patients/${id}/`, data),
   visits:        (id)       => get(`/patients/${id}/visits/`),
   prescriptions: (id)       => get(`/patients/${id}/prescriptions/`),
-  medicalHistory:(id)       => get(`/patients/${id}/medical_history/`),
+  medicalHistory: (id)      => get(`/patients/${id}/medical_history/`),
   labOrders:     (id)       => get(`/patients/${id}/lab_orders/`),
   shaStatus:     (id)       => get(`/patients/${id}/sha_status/`),
+  search:        (query)    => get('/patients/', { search: query }),
 }
 
 
@@ -163,8 +163,8 @@ export const visitsAPI = {
   create:       (data)     => post('/visits/', data),
   update:       (id, data) => patch(`/visits/${id}/`, data),
   triage:       (id, data) => post(`/visits/${id}/triage/`, data),
-  assignQueue:  (id, data) => post(`/visits/${id}/assign_queue/`, data),
-  updateStatus: (id, data) => post(`/visits/${id}/update_status/`, data),
+  assignQueue:  (id, data) => post(`/visits/${id}/assign-queue/`, data),  // FIXED: underscore to hyphen
+  updateStatus: (id, data) => post(`/visits/${id}/update-status/`, data),  // FIXED: underscore to hyphen
 }
 
 export const queueAPI = {
@@ -193,8 +193,9 @@ export const consultationsAPI = {
   create:       (data)     => post('/consultations/', data),
   update:       (id, data) => patch(`/consultations/${id}/`, data),
   addDiagnosis: (id, data) => post(`/consultations/${id}/add_diagnosis/`, data),
-  prescriptions:(id)       => get(`/consultations/${id}/prescriptions/`),
+  prescriptions: (id)      => get(`/consultations/${id}/prescriptions/`),
   labOrders:    (id)       => get(`/consultations/${id}/lab_orders/`),
+  getByVisit:   (visitId)  => get('/consultations/', { visit: visitId }),  // ADDED
 }
 
 export const diagnosesAPI = {
@@ -214,9 +215,9 @@ export const medicinesAPI = {
   create:      (data)          => postForm('/medicines/', data),
   update:      (id, data)      => patchForm(`/medicines/${id}/`, data),
   delete:      (id)            => del(`/medicines/${id}/`),
-  lowStock:    ()              => get('/medicines/low_stock/'),
+  lowStock:    ()              => get('/medicines/low-stock/'),  // FIXED: underscore to hyphen
   adjustStock: (id, data)      => post(`/medicines/${id}/adjust_stock/`, data),
-  categories:  ()              => get('/medicine-categories/'),
+  categories:  ()              => get('/medicine-categories/'),  // ADDED
 }
 
 export const stockAPI = {
@@ -231,11 +232,13 @@ export const prescriptionsAPI = {
 }
 
 export const otcAPI = {
-  list:     (params)   => get('/otc-sales/', params),
-  get:      (id)       => get(`/otc-sales/${id}/`),
-  create:   (data)     => post('/otc-sales/', data),
-  dispense: (id)       => post(`/otc-sales/${id}/dispense/`),
-  markPaid: (id, data) => post(`/otc-sales/${id}/mark_paid/`, data),
+  list:        (params)   => get('/otc-sales/', params),
+  get:         (id)       => get(`/otc-sales/${id}/`),
+  create:      (data)     => post('/otc-sales/', data),
+  dispense:    (id)       => post(`/otc-sales/${id}/dispense/`),
+  markPaid:    (id, data) => post(`/otc-sales/${id}/mark_paid/`, data),
+  addItem:     (saleId, data) => post(`/otc-sales/${saleId}/add_item/`, data),    // ADDED
+  removeItem:  (saleId, itemId) => del(`/otc-sales/${saleId}/items/${itemId}/`),   // ADDED
 }
 
 
@@ -252,9 +255,10 @@ export const labOrdersAPI = {
   list:          (params)   => get('/lab-orders/', params),
   get:           (id)       => get(`/lab-orders/${id}/`),
   create:        (data)     => post('/lab-orders/', data),
-  collectSample: (id)       => post(`/lab-orders/${id}/collect_sample/`),
-  enterResults:  (id, data) => post(`/lab-orders/${id}/enter_results/`, data),
-  release:       (id)       => post(`/lab-orders/${id}/release_results/`),
+  collectSample: (id)       => post(`/lab-orders/${id}/collect-sample/`),   // FIXED: underscore to hyphen
+  enterResults:  (id, data) => post(`/lab-orders/${id}/enter-results/`, data), // FIXED: underscore to hyphen
+  release:       (id)       => post(`/lab-orders/${id}/release-results/`),     // FIXED: underscore to hyphen
+  getCompleted:  (params)   => get('/lab-orders/', { ...params, status: 'COMPLETED' }), // ADDED
 }
 
 export const labResultsAPI = {
@@ -277,8 +281,8 @@ export const wardsAPI = {
   list:  (params) => get('/wards/', params),
   get:   (id)     => get(`/wards/${id}/`),
   beds:  (id, params) => get(`/wards/${id}/beds/`, params),
-  create:(data)   => post('/wards/', data),
-  update:(id, d)  => patch(`/wards/${id}/`, d),
+  create: (data) => post('/wards/', data),
+  update: (id, d) => patch(`/wards/${id}/`, d),
 }
 
 export const bedsAPI = {
@@ -295,10 +299,11 @@ export const admissionsAPI = {
   update:       (id, data) => patch(`/admissions/${id}/`, data),
   active:       ()         => get('/admissions/', { active: true }),
   charges:      (id)       => get(`/admissions/${id}/charges/`),
-  addCharge:    (id, data) => post(`/admissions/${id}/add_charge/`, data),
-  recordVitals: (id, data) => post(`/admissions/${id}/record_vitals/`, data),
+  addCharge:    (id, data) => post(`/admissions/${id}/add-charge/`, data),   // FIXED: underscore to hyphen
+  recordVitals: (id, data) => post(`/admissions/${id}/record-vitals/`, data), // FIXED: underscore to hyphen
   vitals:       (id)       => get(`/admissions/${id}/vitals/`),
   discharge:    (id, data) => post(`/admissions/${id}/discharge/`, data),
+  getWards:     ()         => get('/wards/'),  // ADDED
 }
 
 export const medicineRequestsAPI = {
@@ -320,10 +325,11 @@ export const emergencyAPI = {
   getVisit:     (id)       => get(`/emergency-visits/${id}/`),
   createVisit:  (data)     => post('/emergency-visits/', data),
   updateVisit:  (id, data) => patch(`/emergency-visits/${id}/`, data),
-  assignBed:    (id, data) => post(`/emergency-visits/${id}/assign_bed/`, data),
-  transferWard: (id, data) => post(`/emergency-visits/${id}/transfer_to_ward/`, data),
+  assignBed:    (id, data) => post(`/emergency-visits/${id}/assign-bed/`, data),      // FIXED: underscore to hyphen
+  transferWard: (id, data) => post(`/emergency-visits/${id}/transfer-to-ward/`, data), // FIXED: underscore to hyphen
   addCharge:    (id, data) => post(`/emergency-visits/${id}/add_charge/`, data),
-  recordPayment:(id, data) => post(`/emergency-visits/${id}/record_payment/`, data),
+  recordPayment: (id, data) => post(`/emergency-visits/${id}/record_payment/`, data),
+  activeVisits: ()        => get('/emergency-visits/', { active: true }),  // ADDED
 }
 
 
@@ -471,8 +477,8 @@ export const attendanceAPI = {
   generateQR:   (data)   => post('/attendance-qr-codes/', data),
   list:         (params) => get('/attendance/', params),
   get:          (id)     => get(`/attendance/${id}/`),
-  scanCheckIn:  (data)   => post('/attendance/scan_check_in/', data),
-  scanCheckOut: (data)   => post('/attendance/scan_check_out/', data),
+  scanCheckIn:  (data)   => post('/attendance/scan-check-in/', data),   // FIXED: underscore to hyphen
+  scanCheckOut: (data)   => post('/attendance/scan-check-out/', data),  // FIXED: underscore to hyphen
   manualEntry:  (data)   => post('/attendance/manual_entry/', data),
 }
 
@@ -501,7 +507,7 @@ export const assetsAPI = {
   get:            (id)       => get(`/assets/${id}/`),
   create:         (data)     => postForm('/assets/', data),
   update:         (id, data) => patchForm(`/assets/${id}/`, data),
-  maintenanceDue: ()         => get('/assets/maintenance_due/'),
+  maintenanceDue: ()         => get('/assets/maintenance-due/'),  // FIXED: underscore to hyphen
   byCategory:     (cat)      => get('/assets/by_category/', { category: cat }),
   logs:           (params)   => get('/asset-maintenance-logs/', params),
   createLog:      (data)     => post('/asset-maintenance-logs/', data),
@@ -531,8 +537,8 @@ export const notificationsAPI = {
 
 export const messagingAPI = {
   conversations:  (params)   => get('/conversations/', params),
-  getConversation:(id)       => get(`/conversations/${id}/`),
-  createConversation:(data)  => post('/conversations/', data),
+  getConversation: (id)      => get(`/conversations/${id}/`),
+  createConversation: (data) => post('/conversations/', data),
   messages:       (id)       => get(`/conversations/${id}/messages/`),
   sendMessage:    (id, data) => post(`/conversations/${id}/send_message/`, data),
 }
